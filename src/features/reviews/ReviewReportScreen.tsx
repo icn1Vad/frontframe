@@ -31,7 +31,10 @@ export function ReviewReportScreen({
 
   return (
     <>
-      <div className="report-shell" data-review-task-id={taskId}>
+      <div
+        className={`report-shell${resolved ? " resolved" : ""}`}
+        data-review-task-id={taskId}
+      >
         <aside className="report-nav" aria-label="报告目录">
           <strong>报告目录</strong>
           {reportSections.map((section, index) => (
@@ -68,16 +71,26 @@ export function ReviewReportScreen({
         <aside className="report-actions">
           <small>当前审查文件</small>
           <h3>{documentName}</h3>
-          <Status tone={resolved ? "success" : "warning"}>
+          <Status
+            className="report-status"
+            tone={resolved ? "success" : "warning"}
+          >
             {resolved ? "风险已处理" : "待风险处理"}
           </Status>
           <p>{resolved ? "风险已全部处理，可正式入库" : "还有 2 项风险未处理，正式入库禁用"}</p>
-          <button className="primary" type="button" onClick={() => setResolved(true)}>
+          <button
+            className="primary report-resolve-button"
+            type="button"
+            onClick={() => setResolved(true)}
+          >
             忽略全部风险项
           </button>
           <div>
             <button className="secondary" type="button">导出报告</button>
             <button className="secondary" type="button" disabled={!resolved}>正式入库</button>
+          </div>
+          <div className="report-feedback-slot" role="status" aria-live="polite">
+            {resolved ? <span>风险处理状态已更新</span> : null}
           </div>
         </aside>
       </div>
@@ -96,4 +109,3 @@ export function ReviewReportScreen({
     </>
   );
 }
-

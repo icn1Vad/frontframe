@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { DataGrid, type DataGridColumn } from "@/shared/table";
 import { Pagination, type PaginationProps } from "@/shared/ui";
 import type { DocumentId, DocumentSummary } from "../domain";
@@ -40,6 +40,35 @@ export function DocumentTableView({
   renderPreview,
 }: DocumentTableViewProps) {
   const [dialog, setDialog] = useState<DocumentDialogState>(null);
+  const [feedback, setFeedback] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!feedback) return;
+    const timeoutId = window.setTimeout(() => setFeedback(null), 2400);
+    return () => window.clearTimeout(timeoutId);
+  }, [feedback]);
+
+  const commandHandlers = {
+    publish: commands?.publish
+      ? async (documentId: DocumentId) => {
+          await commands.publish?.(documentId);
+          setFeedback("文件已入库");
+        }
+      : undefined,
+    startReview: commands?.startReview
+      ? async (documentId: DocumentId) => {
+          await commands.startReview?.(documentId);
+          setFeedback("已开始审查");
+        }
+      : undefined,
+  };
+
+  const handleDelete = onDelete
+    ? async (documentId: DocumentId) => {
+        await onDelete(documentId);
+        setFeedback("文件已删除");
+      }
+    : undefined;
   const columnsWithActions: readonly DataGridColumn<DocumentSummary>[] = [
     ...columns,
     {
@@ -50,7 +79,7 @@ export function DocumentTableView({
         <DocumentActionCell
           document={document}
           actions={actions}
-          commands={commands}
+        commands={commandHandlers}
           openDialog={setDialog}
         />
       ),
@@ -69,12 +98,15 @@ export function DocumentTableView({
         error={error}
         empty={empty}
       />
+      <div className="action-feedback-slot" role="status" aria-live="polite">
+        {feedback ? <span className="action-feedback">{feedback}</span> : null}
+      </div>
       {pagination ? <Pagination {...pagination} /> : null}
       <DocumentDialogHost
         state={dialog}
         documents={rows}
         onClose={() => setDialog(null)}
-        onDelete={onDelete}
+        onDelete={handleDelete}
         renderPreview={renderPreview}
       />
     </>

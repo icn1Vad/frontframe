@@ -59,6 +59,13 @@ export function DataGrid<T>({
     "--data-grid-columns": columnTemplate,
     "--data-grid-min-width": numericWidth === null ? undefined : `${numericWidth}px`,
   };
+  const stateKind = loading
+    ? "loading"
+    : error
+      ? "error"
+      : rows.length === 0
+        ? "empty"
+        : null;
   const stateContent = loading
     ? loadingContent
     : error
@@ -97,7 +104,9 @@ export function DataGrid<T>({
         {stateContent !== null ? (
           <div
             className="table-row data-grid-state"
+            data-state={stateKind ?? undefined}
             role="row"
+            key={stateKind}
             style={{ gridTemplateColumns: "var(--data-grid-columns)" }}
           >
             <span role="cell" style={{ gridColumn: "1 / -1" }}>

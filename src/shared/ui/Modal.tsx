@@ -1,4 +1,5 @@
 import {
+  useState,
   useEffect,
   useId,
   useRef,
@@ -28,10 +29,32 @@ export function Modal({
   const subtitleId = useId();
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const onCloseRef = useRef(onClose);
+  const closingRef = useRef(false);
+  const closeTimeoutRef = useRef<number | null>(null);
+  const [isClosing, setIsClosing] = useState(false);
 
   useEffect(() => {
     onCloseRef.current = onClose;
   }, [onClose]);
+
+  const requestClose = () => {
+    if (closingRef.current) return;
+    closingRef.current = true;
+
+    if (
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
+      onCloseRef.current();
+      return;
+    }
+
+    setIsClosing(true);
+    closeTimeoutRef.current = window.setTimeout(() => {
+      closeTimeoutRef.current = null;
+      onCloseRef.current();
+    }, 240);
+  };
 
   useEffect(() => {
     const previouslyFocused = document.activeElement as HTMLElement | null;
@@ -40,31 +63,34 @@ export function Modal({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        onCloseRef.current();
+        requestClose();
       }
     };
 
     document.addEventListener("keydown", handleKeyDown);
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
+      if (closeTimeoutRef.current !== null) {
+        window.clearTimeout(closeTimeoutRef.current);
+      }
       previouslyFocused?.focus();
     };
   }, []);
 
   const handleBackdropMouseDown = (event: MouseEvent<HTMLDivElement>) => {
     if (event.target === event.currentTarget) {
-      onClose();
+      requestClose();
     }
   };
 
   return (
     <div
-      className="modal-backdrop"
+      className={`modal-backdrop ${isClosing ? "closing" : ""}`}
       role="presentation"
       onMouseDown={handleBackdropMouseDown}
     >
       <div
-        className={classNames("modal", className)}
+        className={classNames("modal", isClosing && "closing", className)}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -76,7 +102,7 @@ export function Modal({
           className="modal-close"
           aria-label={closeLabel}
           title={closeLabel}
-          onClick={onClose}
+          onClick={requestClose}
         >
           ×
         </button>

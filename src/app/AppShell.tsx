@@ -25,6 +25,7 @@ export function AppShell({
 }: AppShellProps) {
   const router = useRouter();
   const [navigationOpen, setNavigationOpen] = useState(false);
+  const [isNavigating, setIsNavigating] = useState(false);
   const moduleDefinition = registry.get(config.moduleId);
   const activeModuleId = config.activeModuleId ?? config.moduleId;
   const title = config.title ?? moduleDefinition.title;
@@ -37,12 +38,35 @@ export function AppShell({
   }, [router.events]);
 
   useEffect(() => {
+    const startNavigation = () => setIsNavigating(true);
+    const finishNavigation = () => setIsNavigating(false);
+
+    router.events.on("routeChangeStart", startNavigation);
+    router.events.on("routeChangeComplete", finishNavigation);
+    router.events.on("routeChangeError", finishNavigation);
+
+    return () => {
+      router.events.off("routeChangeStart", startNavigation);
+      router.events.off("routeChangeComplete", finishNavigation);
+      router.events.off("routeChangeError", finishNavigation);
+    };
+  }, [router.events]);
+
+  useEffect(() => {
     document.body.classList.toggle("sidebar-open", navigationOpen);
     return () => document.body.classList.remove("sidebar-open");
   }, [navigationOpen]);
 
   return (
     <>
+      {isNavigating ? (
+        <div
+          className="route-progress"
+          role="status"
+          aria-live="polite"
+          aria-label="页面加载中"
+        />
+      ) : null}
       <Head>
         <title>{title} · ProofSpace</title>
       </Head>

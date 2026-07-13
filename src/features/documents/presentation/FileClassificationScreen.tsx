@@ -1,5 +1,5 @@
 import { Check, Eye, FileText, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState, type DragEvent } from "react";
 import { IconButton, Modal, Pagination, Status } from "@/shared/ui";
 import type {
   DocumentCategoryCode,
@@ -55,12 +55,21 @@ const candidateStatus = {
   confirmed: { label: "已确认", tone: "success" },
 } as const;
 
+function isLeavingDragTarget(event: DragEvent<HTMLElement>): boolean {
+  return (
+    event.relatedTarget instanceof Node &&
+    event.currentTarget.contains(event.relatedTarget)
+  );
+}
+
 export function FileClassificationScreen() {
   const [stage, setStage] = useState<Stage>("empty");
   const [dialog, setDialog] = useState<DialogState>(null);
   const [files, setFiles] = useState<readonly UploadFile[]>(initialFiles);
   const [candidates, setCandidates] =
     useState<readonly ClassificationCandidate[]>(initialCandidates);
+  const [isDragging, setIsDragging] = useState(false);
+  const [feedback, setFeedback] = useState<string | null>(null);
 
   const previewName = dialog?.kind === "preview"
     ? [...files, ...candidates].find((item) => item.id === dialog.entityId)?.name
@@ -77,12 +86,46 @@ export function FileClassificationScreen() {
     );
   };
 
+  useEffect(() => {
+    if (!feedback) return;
+    const timeoutId = window.setTimeout(() => setFeedback(null), 2400);
+    return () => window.clearTimeout(timeoutId);
+  }, [feedback]);
+
+  const handleDragOver = (event: DragEvent<HTMLElement>) => {
+    event.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (event: DragEvent<HTMLElement>) => {
+    if (!isLeavingDragTarget(event)) setIsDragging(false);
+  };
+
+  const handleDrop = (event: DragEvent<HTMLElement>) => {
+    event.preventDefault();
+    setIsDragging(false);
+  };
+
+  const feedbackNode = (
+    <div className="action-feedback-slot" role="status" aria-live="polite">
+      {feedback ? <span className="action-feedback">{feedback}</span> : null}
+    </div>
+  );
+
   if (stage === "empty") {
     return (
       <div className="upload-panel">
         <h2>上传待分类文件</h2>
         <p>系统会生成推荐类型、推荐分类、文件层级和人工确认状态。</p>
-        <button className="dropzone" type="button" onClick={() => setStage("pending")}>
+        <button
+          className={`dropzone${isDragging ? " dragging" : ""}`}
+          type="button"
+          onClick={() => setStage("pending")}
+          onDragEnter={handleDragOver}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
           <span className="plus-circle"><Plus /></span>
           <strong>拖拽文件到这里，或点击选择文件</strong>
           <small>支持 PDF / DOCX / XLSX / TXT，最大 50M</small>
@@ -99,7 +142,15 @@ export function FileClassificationScreen() {
           <h2>待上传文件</h2>
           <p>文件尚未提交；确认上传后进入分类，完成识别后等待人工确认。</p>
           <div className="pending-grid">
-            <button className="pending-drop" type="button" onClick={() => setDialog({ kind: "upload" })}>
+            <button
+              className={`pending-drop${isDragging ? " dragging" : ""}`}
+              type="button"
+              onClick={() => setDialog({ kind: "upload" })}
+              onDragEnter={handleDragOver}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+            >
               <span className="plus-circle"><Plus /></span>
               <strong>继续拖拽文件到这里</strong>
               <small>支持 PDF / DOCX / XLSX / TXT，最大 50M</small>
@@ -115,7 +166,16 @@ export function FileClassificationScreen() {
                   <Status>待上传</Status>
                   <span className="actions">
                     <IconButton label={`预览 ${file.name}`} onClick={() => setDialog({ kind: "preview", entityId: file.id })}><Eye /></IconButton>
-                    <IconButton label={`删除 ${file.name}`} danger onClick={() => setFiles((current) => current.filter((item) => item.id !== file.id))}><Trash2 /></IconButton>
+                    <IconButton
+                      label={`删除 ${file.name}`}
+                      danger
+                      onClick={() => {
+                        setFiles((current) => current.filter((item) => item.id !== file.id));
+                        setFeedback("文件已移除");
+                      }}
+                    >
+                      <Trash2 />
+                    </IconButton>
                   </span>
                 </div>
               ))}
@@ -123,11 +183,32 @@ export function FileClassificationScreen() {
           </div>
           <div className="pending-footer">
             <p>上传前可预览并删除错误文件；删除全部不会影响已上传记录。</p>
-            <button className="secondary" type="button" disabled={files.length === 0} onClick={() => setFiles([])}>删除全部</button>
-            <button className="primary" type="button" disabled={files.length === 0} onClick={() => setStage("confirm")}>确认上传</button>
+            <button
+              className="secondary"
+              type="button"
+              disabled={files.length === 0}
+              onClick={() => {
+                setFiles([]);
+                setFeedback("已清空待上传文件");
+              }}
+            >
+              删除全部
+            </button>
+            <button
+              className="primary"
+              type="button"
+              disabled={files.length === 0}
+              onClick={() => {
+                setStage("confirm");
+                setFeedback("已进入分类确认流程");
+              }}
+            >
+              确认上传
+            </button>
           </div>
+          {feedbackNode}
         </div>
-        {dialog?.kind === "upload" ? <UploadModal onClose={() => setDialog(null)} onConfirm={() => { setDialog(null); setStage("confirm"); }} /> : null}
+        {dialog?.kind === "upload" ? <UploadModal onClose={() => setDialog(null)} onConfirm={() => { setDialog(null); setStage("confirm"); setFeedback("已进入分类确认流程"); }} /> : null}
         {dialog?.kind === "preview" ? <PreviewModal name={previewName} onClose={() => setDialog(null)} /> : null}
       </>
     );
@@ -160,27 +241,74 @@ export function FileClassificationScreen() {
               <select aria-label="文件分类" value={candidate.category} onChange={(event) => updateCandidate(candidate.id, { category: event.target.value as DocumentCategoryCode })}>
                 {Object.entries(documentCategoryLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}
               </select>
-              <Status tone={status.tone}>{status.label}</Status>
+              <Status
+                tone={status.tone}
+                className={candidate.state === "classifying" ? "status-pulse" : undefined}
+              >
+                {status.label}
+              </Status>
               <span className="actions">
                 <IconButton label={`预览 ${candidate.name}`} onClick={() => setDialog({ kind: "preview", entityId: candidate.id })}><Eye /></IconButton>
-                <IconButton label={`确认 ${candidate.name}`} disabled={candidate.state === "classifying" || candidate.state === "confirmed"} onClick={() => updateCandidate(candidate.id, { state: "confirmed" })}><Check /></IconButton>
-                <IconButton label={`删除 ${candidate.name}`} danger onClick={() => setCandidates((current) => current.filter((item) => item.id !== candidate.id))}><Trash2 /></IconButton>
+                <IconButton
+                  label={`确认 ${candidate.name}`}
+                  disabled={candidate.state === "classifying" || candidate.state === "confirmed"}
+                  onClick={() => {
+                    updateCandidate(candidate.id, { state: "confirmed" });
+                    setFeedback("文件已确认");
+                  }}
+                >
+                  <Check />
+                </IconButton>
+                <IconButton
+                  label={`删除 ${candidate.name}`}
+                  danger
+                  onClick={() => {
+                    setCandidates((current) => current.filter((item) => item.id !== candidate.id));
+                    setFeedback("文件已移除");
+                  }}
+                >
+                  <Trash2 />
+                </IconButton>
               </span>
             </div>
           );
         })}
       </div>
       <Pagination page={1} pageCount={candidates.length ? 1 : 0} onPageChange={() => undefined} />
-      {dialog?.kind === "upload" ? <UploadModal onClose={() => setDialog(null)} onConfirm={() => setDialog(null)} /> : null}
+      {feedbackNode}
+      {dialog?.kind === "upload" ? <UploadModal onClose={() => setDialog(null)} onConfirm={() => { setDialog(null); setFeedback("文件已加入待上传队列"); }} /> : null}
       {dialog?.kind === "preview" ? <PreviewModal name={previewName} onClose={() => setDialog(null)} /> : null}
     </>
   );
 }
 
 function UploadModal({ onClose, onConfirm }: { onClose: () => void; onConfirm: () => void }) {
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleDragOver = (event: DragEvent<HTMLElement>) => {
+    event.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (event: DragEvent<HTMLElement>) => {
+    if (!isLeavingDragTarget(event)) setIsDragging(false);
+  };
+
+  const handleDrop = (event: DragEvent<HTMLElement>) => {
+    event.preventDefault();
+    setIsDragging(false);
+  };
+
   return (
     <Modal title="继续上传文件" subtitle="拖入后先进入待上传队列，确认后进入文件分类。" onClose={onClose}>
-      <button className="modal-drop" type="button">
+      <button
+        className={`modal-drop${isDragging ? " dragging" : ""}`}
+        type="button"
+        onDragEnter={handleDragOver}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
         <span className="plus-circle"><Plus /></span>
         <strong>拖入新文件，或点击加号选择电脑中的文件</strong>
         <small>支持 PDF / DOCX / XLSX / TXT，最大 50M</small>
@@ -205,4 +333,3 @@ function PreviewModal({ name, onClose }: { name?: string; onClose: () => void })
     </Modal>
   );
 }
-

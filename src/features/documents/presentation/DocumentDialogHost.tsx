@@ -111,6 +111,7 @@ export function DocumentDialogHost({
           disabled={!onDelete || submitting}
           onClick={handleDelete}
         >
+          {submitting ? <span className="button-spinner" aria-hidden="true" /> : null}
           {submitting ? "删除中…" : "删除"}
         </button>
         <button type="button" className="primary" onClick={onClose}>
