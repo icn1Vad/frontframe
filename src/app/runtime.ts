@@ -12,5 +12,9 @@ export const demoSession: AppSession = {
     displayName: "严凯丰",
     roleLabel: "管理员",
   },
+  signOut() {
+    if (typeof window !== "undefined") {
+      window.location.assign("/?auth=login#experience");
+    }
+  },
 };
-
