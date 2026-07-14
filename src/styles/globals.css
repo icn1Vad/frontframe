@@ -67,7 +67,7 @@ h1, h2, h3, p { margin: 0; }
 .header p { margin-top: 4px; color: var(--muted); font-size: 12px; }
 .mobile-menu-button { display: none; }
 .account { min-height: 53px; padding: 0; display: flex; flex: 0 0 auto; align-items: center; gap: 20px; color: var(--muted); background: none; font-size: 12px; white-space: nowrap; }
-.content { position: relative; width: 100%; max-width: 1380px; min-width: 0; min-height: calc(100vh - 74px); padding: 30px; }
+.content { position: relative; width: 100%; max-width: none; min-width: 0; min-height: calc(100vh - 74px); padding: 30px; }
 
 .primary, .secondary { display: inline-flex; height: 36px; padding: 0 16px; align-items: center; justify-content: center; border-radius: 8px; font-size: 13px; font-weight: 700; }
 .primary { color: #fff; background: var(--primary); }
@@ -735,8 +735,7 @@ button:disabled { cursor: not-allowed; }
   text-transform: uppercase;
 }
 .landing-auth-card {
-  width: min(100%, 540px);
-  margin: 0 auto;
+  width: 100%;
   padding: clamp(24px, 4vw, 38px);
   color: var(--landing-ink);
   background: rgba(255, 252, 246, .72);
@@ -842,13 +841,9 @@ button:disabled { cursor: not-allowed; }
 }
 .landing-auth-switch:not(:disabled):hover { color: #9f432f; }
 
-@media (min-width: 1024px) {
-  .landing-auth-column { min-height: 640px; }
-}
-
 @media (max-width: 1023px) {
   .landing-experience-copy { max-width: 700px; }
-  .landing-auth-column { width: 100%; }
+  .landing-auth-card { max-width: 620px; }
 }
 
 @media (max-width: 768px) {
