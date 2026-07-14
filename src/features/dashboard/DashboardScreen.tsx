@@ -1,13 +1,8 @@
 import Link from "next/link";
 
 import { routes } from "../../app";
-
-const metrics = [
-  ["已入库制度", "1,284"],
-  ["已入库合同", "8,426"],
-  ["已入库报告", "326"],
-  ["已入库其他文件", "674"],
-] as const;
+import type { DashboardOverview } from "../../app/services";
+import { PageStack, StatGrid } from "../../shared/ui";
 
 const rows = [
   ["制度", "10 项", "1 项", "2 项"],
@@ -15,18 +10,22 @@ const rows = [
   ["报告", "10 项", "1 项", "2 项"],
 ] as const;
 
-export function DashboardScreen() {
+export interface DashboardScreenProps {
+  readonly overview: DashboardOverview;
+}
+
+export function DashboardScreen({ overview }: DashboardScreenProps) {
   return (
-    <>
-      <div className="metric-grid">
-        {metrics.map(([label, value]) => (
+    <PageStack>
+      <StatGrid className="metric-grid">
+        {overview.metrics.map(({ label, value }) => (
           <div className="metric-card" key={label}>
             <span>{label}</span>
             <strong>{value}</strong>
             <Link href={routes.knowledge}>查看知识库</Link>
           </div>
         ))}
-      </div>
+      </StatGrid>
       <div className="flow-panel">
         <h2>审查流程概览</h2>
         <div className="flow-row head">
@@ -46,13 +45,13 @@ export function DashboardScreen() {
                     index ? routes.reviewTasks : routes.classificationTasks
                   }
                 >
-                  {index ? "审查任务 →" : "分类任务 →"}
+                  {index ? "审查任务池 →" : "分类任务池 →"}
                 </Link>
               </span>
             ))}
           </div>
         ))}
       </div>
-    </>
+    </PageStack>
   );
 }

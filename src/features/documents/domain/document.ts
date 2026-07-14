@@ -1,10 +1,18 @@
 declare const documentIdBrand: unique symbol;
+declare const classificationCandidateIdBrand: unique symbol;
+declare const classificationTaskIdBrand: unique symbol;
 declare const reviewTaskIdBrand: unique symbol;
 declare const reviewProgressBrand: unique symbol;
 declare const userIdBrand: unique symbol;
 declare const isoDateTimeBrand: unique symbol;
 
 export type DocumentId = string & { readonly [documentIdBrand]: true };
+export type ClassificationCandidateId = string & {
+  readonly [classificationCandidateIdBrand]: true;
+};
+export type ClassificationTaskId = string & {
+  readonly [classificationTaskIdBrand]: true;
+};
 export type ReviewTaskId = string & { readonly [reviewTaskIdBrand]: true };
 export type ReviewProgress = number & { readonly [reviewProgressBrand]: true };
 export type UserId = string & { readonly [userIdBrand]: true };
@@ -68,6 +76,14 @@ export type DocumentState =
   | {
       readonly kind: "deleted";
       readonly deletedAt: IsoDateTime;
+      readonly previousKind?:
+        | "pending"
+        | "classified"
+        | "reviewing"
+        | "reviewed"
+        | "published";
+      readonly reviewTaskId?: ReviewTaskId;
+      readonly reason?: "user-action" | "knowledge-deleted";
     };
 
 export type DocumentStateKind = DocumentState["kind"];
@@ -93,6 +109,24 @@ export function createDocumentId(value: string): DocumentId {
     throw new Error("Document id cannot be empty.");
   }
   return normalized as DocumentId;
+}
+
+export function createClassificationCandidateId(
+  value: string,
+): ClassificationCandidateId {
+  const normalized = value.trim();
+  if (!normalized) {
+    throw new Error("Classification candidate id cannot be empty.");
+  }
+  return normalized as ClassificationCandidateId;
+}
+
+export function createClassificationTaskId(value: string): ClassificationTaskId {
+  const normalized = value.trim();
+  if (!normalized) {
+    throw new Error("Classification task id cannot be empty.");
+  }
+  return normalized as ClassificationTaskId;
 }
 
 export function createUserId(value: string): UserId {
@@ -153,9 +187,10 @@ export function getDocumentReviewTaskId(
       return state.reviewTaskId;
     case "published":
       return state.source === "review" ? state.reviewTaskId : undefined;
+    case "deleted":
+      return state.reviewTaskId;
     case "pending":
     case "classified":
-    case "deleted":
       return undefined;
   }
 }

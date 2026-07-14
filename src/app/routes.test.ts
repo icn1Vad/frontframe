@@ -2,6 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import { routes, type AppRoute } from "./routes";
 
+describe("canonical task pool routes", () => {
+  it("uses plural task-pool paths", () => {
+    expect(routes.classificationTasks).toBe("/classification-tasks");
+    expect(routes.reviewTasks).toBe("/review-tasks");
+  });
+});
+
 describe("routes.reviewReport", () => {
   it("trims and URL-encodes the review task id as one path segment", () => {
     const href: AppRoute = routes.reviewReport(" review/task ?#中文 ");

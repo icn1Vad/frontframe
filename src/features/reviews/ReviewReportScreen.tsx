@@ -9,6 +9,7 @@ export interface ReviewReportScreenProps {
   readonly documentName: string;
   readonly onExportReport?: ReportAction;
   readonly onPublish?: ReportAction;
+  readonly onIgnoreAllRisks?: ReportAction;
 }
 
 const reportSections = [
@@ -42,13 +43,15 @@ export function ReviewReportScreen({
   documentName,
   onExportReport,
   onPublish,
+  onIgnoreAllRisks,
 }: ReviewReportScreenProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [ignoreConfirmationOpen, setIgnoreConfirmationOpen] = useState(false);
   const [resolved, setResolved] = useState(false);
   const [activeSection, setActiveSection] =
     useState<ReportSection>("审查总结");
   const [pendingAction, setPendingAction] =
-    useState<"export" | "publish" | null>(null);
+    useState<"export" | "publish" | "ignore" | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const runAction = async (
@@ -84,6 +87,13 @@ export function ReviewReportScreen({
     : pendingAction
       ? "请等待当前操作完成"
       : undefined;
+  const ignoreDisabledReason = resolved
+    ? "风险已全部处理"
+    : !onIgnoreAllRisks
+      ? "风险处理接口尚未接入"
+      : pendingAction
+        ? "请等待当前操作完成"
+        : undefined;
 
   return (
     <>
@@ -166,12 +176,9 @@ export function ReviewReportScreen({
           <button
             className="primary report-resolve-button"
             type="button"
-            disabled={resolved}
-            title={resolved ? "风险已全部处理" : undefined}
-            onClick={() => {
-              setResolved(true);
-              setFeedback("风险处理状态已更新");
-            }}
+            disabled={Boolean(ignoreDisabledReason)}
+            title={ignoreDisabledReason}
+            onClick={() => setIgnoreConfirmationOpen(true)}
           >
             {resolved ? "风险已全部处理" : "忽略全部风险项"}
           </button>
@@ -224,6 +231,53 @@ export function ReviewReportScreen({
           <div className="preview">
             <h3>{documentName}</h3>
             <p>第十二条 审批权限：采购金额超过 500 万元时，由采购管理部提交董事会审议；紧急事项应在 3 个工作日内补充备案。</p>
+          </div>
+        </Modal>
+      ) : null}
+      {ignoreConfirmationOpen ? (
+        <Modal
+          title="忽略全部风险项"
+          subtitle="该操作会记录当前操作者和处理时间。"
+          onClose={() => setIgnoreConfirmationOpen(false)}
+        >
+          <p className="dialog-copy">
+            确认忽略报告中的全部未处理风险项吗？完成后将允许正式入库。
+          </p>
+          <div className="modal-actions">
+            <button
+              className="secondary"
+              type="button"
+              onClick={() => setIgnoreConfirmationOpen(false)}
+            >
+              取消
+            </button>
+            <button
+              className="primary"
+              type="button"
+              disabled={pendingAction === "ignore"}
+              onClick={async () => {
+                setPendingAction("ignore");
+                try {
+                  await onIgnoreAllRisks?.();
+                  setResolved(true);
+                  setFeedback("风险处理状态已更新");
+                  setIgnoreConfirmationOpen(false);
+                } catch (error) {
+                  setFeedback(
+                    error instanceof Error
+                      ? `风险处理失败：${error.message}`
+                      : "风险处理失败，请稍后重试",
+                  );
+                } finally {
+                  setPendingAction(null);
+                }
+              }}
+            >
+              {pendingAction === "ignore" ? (
+                <span className="button-spinner" aria-hidden="true" />
+              ) : null}
+              {pendingAction === "ignore" ? "处理中…" : "确认忽略"}
+            </button>
           </div>
         </Modal>
       ) : null}

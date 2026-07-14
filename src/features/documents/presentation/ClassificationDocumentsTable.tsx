@@ -1,6 +1,9 @@
-import { Eye, FolderArchive, ListChecks, Trash2 } from "lucide-react";
-import { createDocumentColumns } from "./documentPresentation";
-import type { DocumentActionDefinition } from "./documentActions";
+import { Status } from "@/shared/ui";
+import {
+  createDocumentColumns,
+  getDocumentStateTone,
+} from "./documentPresentation";
+import { classificationDocumentActions } from "./documentActionDefinitions";
 import {
   DocumentTableView,
   type DocumentTableViewProps,
@@ -9,45 +12,21 @@ import {
 export const classificationDocumentColumns = createDocumentColumns({
   timeHeader: "分类时间",
   operatorHeader: "分类执行人",
+  renderStatus: (document) => {
+    const label = document.state.kind === "reviewing"
+      ? "已进入审查"
+      : document.state.kind === "classified"
+        ? "待处理"
+        : document.state.kind === "published"
+          ? "已分类入库"
+          : document.state.kind === "deleted"
+            ? "已删除"
+            : "待处理";
+    return <Status tone={getDocumentStateTone(document.state)}>{label}</Status>;
+  },
 });
 
-export const classificationDocumentActions = [
-  {
-    id: "preview",
-    type: "dialog",
-    dialog: "preview",
-    label: "预览",
-    icon: Eye,
-  },
-  {
-    id: "publish",
-    type: "command",
-    command: "publish",
-    label: "入库",
-    icon: FolderArchive,
-    isVisible: (document) =>
-      document.state.kind === "pending" || document.state.kind === "classified",
-  },
-  {
-    id: "start-review",
-    type: "command",
-    command: "startReview",
-    label: "审查",
-    icon: ListChecks,
-    isVisible: (document) =>
-      document.state.kind === "pending" || document.state.kind === "classified",
-  },
-  {
-    id: "delete",
-    type: "dialog",
-    dialog: "delete",
-    label: "删除",
-    icon: Trash2,
-    danger: true,
-    isVisible: (document) =>
-      document.state.kind === "pending" || document.state.kind === "classified",
-  },
-] as const satisfies readonly DocumentActionDefinition[];
+export { classificationDocumentActions } from "./documentActionDefinitions";
 
 export type ClassificationDocumentsTableProps = Omit<
   DocumentTableViewProps,
@@ -63,7 +42,7 @@ export function ClassificationDocumentsTable(
       columns={classificationDocumentColumns}
       actions={classificationDocumentActions}
       tableClassName="classification"
-      ariaLabel="分类任务文件"
+      ariaLabel="分类任务池文件"
     />
   );
 }

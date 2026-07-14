@@ -129,6 +129,12 @@ describe("core module registry", () => {
       route: routes.dashboard,
     });
     expect(moduleRegistry.findByRoute(routes.knowledge)?.id).toBe("knowledge");
+    expect(moduleRegistry.get("classificationTasks").navigation?.label).toBe(
+      "分类任务池",
+    );
+    expect(moduleRegistry.get("reviewTasks").navigation?.label).toBe(
+      "审查任务池",
+    );
     expect(moduleRegistry.find("not-registered")).toBeUndefined();
   });
 });

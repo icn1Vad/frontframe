@@ -16,8 +16,8 @@ describe("MockDocumentRepository.list", () => {
     expect(result).toMatchObject({
       page: 2,
       pageSize: 2,
-      total: 4,
-      pageCount: 2,
+      total: 5,
+      pageCount: 3,
     });
     expect(result.items.map((document) => document.name)).toEqual([
       "供应商说明.pdf",

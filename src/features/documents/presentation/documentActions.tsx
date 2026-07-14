@@ -53,6 +53,10 @@ export interface DocumentActionCellProps {
   actions: readonly DocumentActionDefinition[];
   commands?: DocumentCommandHandlers;
   availableDialogs?: Partial<Record<DocumentDialogKind, boolean>>;
+  pendingCommand?: {
+    readonly documentId: DocumentId;
+    readonly command: DocumentCommand;
+  } | null;
   openDialog: (state: Exclude<DocumentDialogState, null>) => void;
 }
 
@@ -70,6 +74,7 @@ export function DocumentActionCell({
   actions,
   commands = {},
   availableDialogs = {},
+  pendingCommand = null,
   openDialog,
 }: DocumentActionCellProps) {
   return (
@@ -85,7 +90,6 @@ export function DocumentActionCell({
             <IconLink
               href={action.href(document)}
               label={label}
-              visibleLabel={label}
               danger={action.danger}
               key={action.id}
             >
@@ -100,7 +104,6 @@ export function DocumentActionCell({
           return (
             <IconButton
               label={isAvailable ? label : unavailableReason}
-              visibleLabel={isAvailable ? label : `${label}待接入`}
               danger={action.danger}
               disabled={!isAvailable}
               title={isAvailable ? label : unavailableReason}
@@ -118,18 +121,21 @@ export function DocumentActionCell({
         }
 
         const handler = commands[action.command];
+        const pending =
+          pendingCommand?.documentId === document.id &&
+          pendingCommand.command === action.command;
         const unavailableReason = `${label}功能需要先接入后端接口`;
         return (
           <IconButton
-            label={handler ? label : unavailableReason}
-            visibleLabel={handler ? label : `${label}待接入`}
+            label={pending ? `${label}中` : handler ? label : unavailableReason}
             danger={action.danger}
-            disabled={!handler}
-            title={handler ? label : unavailableReason}
+            disabled={!handler || Boolean(pendingCommand)}
+            aria-busy={pending}
+            title={pending ? `${label}中` : handler ? label : unavailableReason}
             onClick={() => handler?.(document.id)}
             key={action.id}
           >
-            <ActionIcon />
+            {pending ? <span className="button-spinner" /> : <ActionIcon />}
           </IconButton>
         );
       })}

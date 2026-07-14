@@ -14,6 +14,8 @@ import {
   type KnowledgeView,
   type PageResult,
 } from "../features/documents";
+import { createIdempotencyKey } from "../shared/lib/idempotency";
+import { PageStack } from "../shared/ui";
 
 interface KnowledgeProps {
   readonly result: PageResult<DocumentSummary>;
@@ -36,8 +38,10 @@ const Knowledge: AppPage<KnowledgeProps> = function Knowledge({
   const router = useRouter();
   const [query, setQuery] = useState(search);
   const [view, setView] = useState<KnowledgeView>("classic");
+  const [rows, setRows] = useState(result.items);
 
   useEffect(() => setQuery(search), [search]);
+  useEffect(() => setRows(result.items), [result.items]);
 
   const navigate = (page: number, nextSearch = search) => {
     void router.push({
@@ -50,7 +54,7 @@ const Knowledge: AppPage<KnowledgeProps> = function Knowledge({
   };
 
   return (
-    <>
+    <PageStack>
       <KnowledgeToolbar
         query={query}
         onQueryChange={setQuery}
@@ -63,7 +67,15 @@ const Knowledge: AppPage<KnowledgeProps> = function Knowledge({
         </div>
       ) : (
         <KnowledgeDocumentsTable
-          rows={result.items}
+          rows={rows}
+          onDelete={async (documentId) => {
+            await appServices.knowledge.softDelete(documentId, {
+              idempotencyKey: createIdempotencyKey("delete-knowledge"),
+            });
+            setRows((current) =>
+              current.filter((document) => document.id !== documentId),
+            );
+          }}
           pagination={{
             page: result.page,
             pageCount: result.pageCount,
@@ -71,7 +83,7 @@ const Knowledge: AppPage<KnowledgeProps> = function Knowledge({
           }}
         />
       )}
-    </>
+    </PageStack>
   );
 };
 
@@ -84,8 +96,7 @@ export const getServerSideProps: GetServerSideProps<KnowledgeProps> = async ({
   return {
     props: {
       search,
-      result: await appServices.documents.list({
-        collection: "knowledge",
+      result: await appServices.knowledge.list({
         page: parsePage(query.page),
         pageSize: 25,
         search: search || undefined,

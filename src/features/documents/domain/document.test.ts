@@ -92,6 +92,14 @@ describe("document state projections", () => {
       }),
     ).toBe(reviewTaskId);
     expect(
+      getDocumentReviewTaskId({
+        kind: "deleted",
+        deletedAt: time,
+        previousKind: "reviewed",
+        reviewTaskId,
+      }),
+    ).toBe(reviewTaskId);
+    expect(
       getDocumentReviewTaskId({ kind: "reviewed", reviewTaskId, reviewedAt: time }),
     ).toBe(reviewTaskId);
     expect(

@@ -1,8 +1,8 @@
-import { definePageConfig, type AppPage } from "../app";
+import { appServices, definePageConfig, type AppPage } from "../app";
 import { FileClassificationScreen } from "../features/documents";
 
 const FileClassification: AppPage = function FileClassification() {
-  return <FileClassificationScreen />;
+  return <FileClassificationScreen api={appServices.classification} />;
 };
 
 FileClassification.pageConfig = definePageConfig({

@@ -14,12 +14,11 @@ export const routes = {
   register: "/register" as const,
   dashboard: "/dashboard" as const,
   fileClassification: "/file-classification" as const,
-  classificationTasks: "/classification-task" as const,
-  reviewTasks: "/review-task" as const,
+  classificationTasks: "/classification-tasks" as const,
+  reviewTasks: "/review-tasks" as const,
   knowledge: "/knowledge" as const,
   chat: "/chat" as const,
   reviewReport(taskId: string): AppRoute {
     return `/review-tasks/${routeSegment(taskId, "Review task id")}/report`;
   },
 } as const;
-

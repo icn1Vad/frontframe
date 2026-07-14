@@ -6,18 +6,39 @@ import {
 } from "../../../app";
 import {
   createReviewTaskId,
+  type DocumentId,
   type ReviewTaskId,
 } from "../../../features/documents";
 import { ReviewReportScreen } from "../../../features/reviews";
+import { createIdempotencyKey } from "../../../shared/lib/idempotency";
 
 interface ReviewReportPageProps {
   readonly taskId: string;
+  readonly documentId: DocumentId;
   readonly documentName: string;
 }
 
 const ReviewReportPage: AppPage<ReviewReportPageProps> =
   function ReviewReportPage(props) {
-    return <ReviewReportScreen {...props} />;
+    const taskId = createReviewTaskId(props.taskId);
+    return (
+      <ReviewReportScreen
+        {...props}
+        onExportReport={async () => {
+          await appServices.reviewTasks.getReport(taskId);
+        }}
+        onIgnoreAllRisks={async () => {
+          await appServices.reviewTasks.ignoreAllRisks(taskId, {
+            idempotencyKey: createIdempotencyKey("ignore-review-risks"),
+          });
+        }}
+        onPublish={async () => {
+          await appServices.reviewTasks.publish(props.documentId, {
+            idempotencyKey: createIdempotencyKey("publish-review-report"),
+          });
+        }}
+      />
+    );
   };
 
 ReviewReportPage.pageConfig = definePageConfig({
@@ -44,6 +65,7 @@ export const getServerSideProps: GetServerSideProps<
   return {
     props: {
       taskId,
+      documentId: document.id,
       documentName: document.name,
     },
   };

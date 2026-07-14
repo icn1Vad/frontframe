@@ -41,6 +41,10 @@ export function DocumentTableView({
 }: DocumentTableViewProps) {
   const [dialog, setDialog] = useState<DocumentDialogState>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [pendingCommand, setPendingCommand] = useState<{
+    readonly documentId: DocumentId;
+    readonly command: "publish" | "startReview";
+  } | null>(null);
 
   useEffect(() => {
     if (!feedback) return;
@@ -51,14 +55,36 @@ export function DocumentTableView({
   const commandHandlers = {
     publish: commands?.publish
       ? async (documentId: DocumentId) => {
-          await commands.publish?.(documentId);
-          setFeedback("文件已入库");
+          setPendingCommand({ documentId, command: "publish" });
+          try {
+            await commands.publish?.(documentId);
+            setFeedback("文件已入库");
+          } catch (commandError) {
+            setFeedback(
+              commandError instanceof Error
+                ? `入库失败：${commandError.message}`
+                : "入库失败，请稍后重试",
+            );
+          } finally {
+            setPendingCommand(null);
+          }
         }
       : undefined,
     startReview: commands?.startReview
       ? async (documentId: DocumentId) => {
-          await commands.startReview?.(documentId);
-          setFeedback("已开始审查");
+          setPendingCommand({ documentId, command: "startReview" });
+          try {
+            await commands.startReview?.(documentId);
+            setFeedback("已开始审查");
+          } catch (commandError) {
+            setFeedback(
+              commandError instanceof Error
+                ? `发起审查失败：${commandError.message}`
+                : "发起审查失败，请稍后重试",
+            );
+          } finally {
+            setPendingCommand(null);
+          }
         }
       : undefined,
   };
@@ -74,13 +100,14 @@ export function DocumentTableView({
     {
       id: "actions",
       header: "操作",
-      width: 248,
+      width: 190,
       cell: (document) => (
         <DocumentActionCell
           document={document}
           actions={actions}
           commands={commandHandlers}
           availableDialogs={{ delete: Boolean(onDelete) }}
+          pendingCommand={pendingCommand}
           openDialog={setDialog}
         />
       ),
@@ -100,7 +127,13 @@ export function DocumentTableView({
         empty={empty}
       />
       <div className="action-feedback-slot" role="status" aria-live="polite">
-        {feedback ? <span className="action-feedback">{feedback}</span> : null}
+        {feedback ? (
+          <span
+            className={`action-feedback${feedback.includes("失败") ? " error" : ""}`}
+          >
+            {feedback}
+          </span>
+        ) : null}
       </div>
       {pagination ? <Pagination {...pagination} /> : null}
       <DocumentDialogHost

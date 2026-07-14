@@ -1,0 +1,121 @@
+import { Eye, FolderArchive, ListChecks, Trash2 } from "lucide-react";
+import { routes } from "../../../app/routes";
+import { getDocumentReviewTaskId, type DocumentSummary } from "../domain";
+import type { DocumentActionDefinition } from "./documentActions";
+
+function reviewReportHref(document: DocumentSummary) {
+  const taskId = getDocumentReviewTaskId(document.state);
+  if (!taskId) {
+    throw new Error(
+      `Document ${document.id} is not associated with a review task.`,
+    );
+  }
+  return routes.reviewReport(taskId);
+}
+
+export const classificationDocumentActions = [
+  {
+    id: "preview",
+    type: "dialog",
+    dialog: "preview",
+    label: "预览",
+    icon: Eye,
+  },
+  {
+    id: "publish",
+    type: "command",
+    command: "publish",
+    label: "入库",
+    icon: FolderArchive,
+    isVisible: (document) =>
+      document.state.kind === "pending" || document.state.kind === "classified",
+  },
+  {
+    id: "start-review",
+    type: "command",
+    command: "startReview",
+    label: "审查",
+    icon: ListChecks,
+    isVisible: (document) =>
+      document.state.kind === "pending" || document.state.kind === "classified",
+  },
+  {
+    id: "delete",
+    type: "dialog",
+    dialog: "delete",
+    label: "删除",
+    icon: Trash2,
+    danger: true,
+    isVisible: (document) =>
+      document.state.kind === "pending" || document.state.kind === "classified",
+  },
+] as const satisfies readonly DocumentActionDefinition[];
+
+export const reviewDocumentActions = [
+  {
+    id: "progress",
+    type: "dialog",
+    dialog: "progress",
+    label: "查看进度",
+    icon: ListChecks,
+    isVisible: (document) => document.state.kind === "reviewing",
+  },
+  {
+    id: "report",
+    type: "link",
+    label: "查看报告",
+    icon: ListChecks,
+    href: reviewReportHref,
+    isVisible: (document) =>
+      document.state.kind === "reviewed" ||
+      (document.state.kind === "published" &&
+        document.state.source === "review") ||
+      (document.state.kind === "deleted" &&
+        Boolean(document.state.reviewTaskId)),
+  },
+  {
+    id: "publish",
+    type: "command",
+    command: "publish",
+    label: "入库",
+    icon: FolderArchive,
+    isVisible: (document) => document.state.kind === "reviewed",
+  },
+  {
+    id: "delete",
+    type: "dialog",
+    dialog: "delete",
+    label: "删除",
+    icon: Trash2,
+    danger: true,
+    isVisible: (document) =>
+      document.state.kind === "reviewing" || document.state.kind === "reviewed",
+  },
+] as const satisfies readonly DocumentActionDefinition[];
+
+export const knowledgeDocumentActions = [
+  {
+    id: "report",
+    type: "link",
+    label: "查看报告",
+    icon: ListChecks,
+    href: reviewReportHref,
+    isVisible: (document) => Boolean(getDocumentReviewTaskId(document.state)),
+  },
+  {
+    id: "preview",
+    type: "dialog",
+    dialog: "preview",
+    label: "预览",
+    icon: Eye,
+    isVisible: (document) => !getDocumentReviewTaskId(document.state),
+  },
+  {
+    id: "delete",
+    type: "dialog",
+    dialog: "delete",
+    label: "删除",
+    icon: Trash2,
+    danger: true,
+  },
+] as const satisfies readonly DocumentActionDefinition[];

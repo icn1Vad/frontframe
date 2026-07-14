@@ -1,27 +1,13 @@
-import { FolderArchive, ListChecks, Trash2 } from "lucide-react";
-import { routes } from "@/app/routes";
 import {
   formatDocumentDateTime,
   createDocumentColumns,
 } from "./documentPresentation";
-import type { DocumentActionDefinition } from "./documentActions";
+import { reviewDocumentActions } from "./documentActionDefinitions";
 import {
   DocumentTableView,
   type DocumentTableViewProps,
 } from "./DocumentTableView";
-import {
-  getDocumentReviewTaskId,
-  getDocumentStateTimestamp,
-  type DocumentSummary,
-} from "../domain";
-
-function reviewReportHref(document: DocumentSummary) {
-  const taskId = getDocumentReviewTaskId(document.state);
-  if (!taskId) {
-    throw new Error(`Document ${document.id} is not associated with a review task.`);
-  }
-  return routes.reviewReport(taskId);
-}
+import { getDocumentStateTimestamp } from "../domain";
 
 export const reviewDocumentColumns = createDocumentColumns({
   timeHeader: "审查进度 / 时间",
@@ -46,44 +32,7 @@ export const reviewDocumentColumns = createDocumentColumns({
   },
 });
 
-export const reviewDocumentActions = [
-  {
-    id: "progress",
-    type: "dialog",
-    dialog: "progress",
-    label: "查看进度",
-    icon: ListChecks,
-    isVisible: (document) => document.state.kind === "reviewing",
-  },
-  {
-    id: "report",
-    type: "link",
-    label: "查看报告",
-    icon: ListChecks,
-    href: reviewReportHref,
-    isVisible: (document) =>
-      document.state.kind === "reviewed" ||
-      (document.state.kind === "published" && document.state.source === "review"),
-  },
-  {
-    id: "delete",
-    type: "dialog",
-    dialog: "delete",
-    label: "删除",
-    icon: Trash2,
-    danger: true,
-    isVisible: (document) =>
-      document.state.kind === "reviewing" || document.state.kind === "reviewed",
-  },
-  {
-    id: "publish",
-    type: "command",
-    command: "publish",
-    label: "入库",
-    icon: FolderArchive,
-    isVisible: (document) => document.state.kind === "reviewed",
-  },
-] as const satisfies readonly DocumentActionDefinition[];
+export { reviewDocumentActions } from "./documentActionDefinitions";
 
 export type ReviewDocumentsTableProps = Omit<
   DocumentTableViewProps,
@@ -97,7 +46,7 @@ export function ReviewDocumentsTable(props: ReviewDocumentsTableProps) {
       columns={reviewDocumentColumns}
       actions={reviewDocumentActions}
       tableClassName="review"
-      ariaLabel="审查任务文件"
+      ariaLabel="审查任务池文件"
     />
   );
 }

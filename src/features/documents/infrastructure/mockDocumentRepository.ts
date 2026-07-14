@@ -42,6 +42,35 @@ const classifiedContract = {
   operator: operatorYan,
 } as const satisfies DocumentSummary;
 
+const reviewedPurchasePolicy = {
+  id: createDocumentId("doc_purchase_policy_approved_v1"),
+  name: "采购管理办法.docx",
+  type: "policy",
+  level: "company",
+  category: "procurement",
+  state: {
+    kind: "published",
+    source: "review",
+    reviewTaskId: createReviewTaskId("review_purchase_policy_approved_v1"),
+    publishedAt: createIsoDateTime("2026-07-05T14:40:00+08:00"),
+  },
+  operator: operatorYan,
+} as const satisfies DocumentSummary;
+
+const classifiedRegulations = {
+  id: createDocumentId("doc_regulations_collection_v1"),
+  name: "法律法规汇编.pdf",
+  type: "other",
+  level: "external-standard",
+  category: "external-standard",
+  state: {
+    kind: "published",
+    source: "classification",
+    publishedAt: createIsoDateTime("2026-07-04T10:18:00+08:00"),
+  },
+  operator: operatorYan,
+} as const satisfies DocumentSummary;
+
 export const mockDocumentCollections = {
   classification: [
     {
@@ -80,9 +109,12 @@ export const mockDocumentCollections = {
       state: {
         kind: "deleted",
         deletedAt: createIsoDateTime("2026-07-04T15:08:00+08:00"),
+        previousKind: "pending",
+        reason: "user-action",
       },
       operator: operatorLi,
     },
+    classifiedRegulations,
   ],
   review: [
     {
@@ -135,39 +167,18 @@ export const mockDocumentCollections = {
       state: {
         kind: "deleted",
         deletedAt: createIsoDateTime("2026-07-04T15:08:00+08:00"),
+        previousKind: "reviewed",
+        reviewTaskId: createReviewTaskId("review_legacy_policy_v2"),
+        reason: "user-action",
       },
       operator: operatorYan,
     },
+    reviewedPurchasePolicy,
   ],
   knowledge: [
-    {
-      id: createDocumentId("doc_purchase_policy_approved_v1"),
-      name: "采购管理办法.docx",
-      type: "policy",
-      level: "company",
-      category: "procurement",
-      state: {
-        kind: "published",
-        source: "review",
-        reviewTaskId: createReviewTaskId("review_purchase_policy_approved_v1"),
-        publishedAt: createIsoDateTime("2026-07-05T14:40:00+08:00"),
-      },
-      operator: operatorYan,
-    },
+    reviewedPurchasePolicy,
     classifiedContract,
-    {
-      id: createDocumentId("doc_regulations_collection_v1"),
-      name: "法律法规汇编.pdf",
-      type: "other",
-      level: "external-standard",
-      category: "external-standard",
-      state: {
-        kind: "published",
-        source: "classification",
-        publishedAt: createIsoDateTime("2026-07-04T10:18:00+08:00"),
-      },
-      operator: operatorYan,
-    },
+    classifiedRegulations,
   ],
 } as const satisfies Record<DocumentCollection, readonly DocumentSummary[]>;
 
@@ -221,12 +232,46 @@ function compareDocuments(
 }
 
 export class MockDocumentRepository implements DocumentRepository {
+  private readonly collections: Record<DocumentCollection, DocumentSummary[]>;
+
   constructor(
-    private readonly collections: Record<
-      DocumentCollection,
-      readonly DocumentSummary[]
-    > = mockDocumentCollections,
-  ) {}
+    collections: Record<DocumentCollection, readonly DocumentSummary[]> =
+      mockDocumentCollections,
+  ) {
+    this.collections = {
+      classification: [...collections.classification],
+      review: [...collections.review],
+      knowledge: [...collections.knowledge],
+    };
+  }
+
+  getFromCollection(
+    collection: DocumentCollection,
+    id: DocumentId,
+  ): DocumentSummary | null {
+    return this.collections[collection].find((document) => document.id === id) ?? null;
+  }
+
+  upsert(
+    collection: DocumentCollection,
+    document: DocumentSummary,
+  ): DocumentSummary {
+    const index = this.collections[collection].findIndex(
+      (candidate) => candidate.id === document.id,
+    );
+    if (index === -1) this.collections[collection].push(document);
+    else this.collections[collection][index] = document;
+    return document;
+  }
+
+  remove(collection: DocumentCollection, id: DocumentId): DocumentSummary | null {
+    const index = this.collections[collection].findIndex(
+      (document) => document.id === id,
+    );
+    if (index === -1) return null;
+    const [removed] = this.collections[collection].splice(index, 1);
+    return removed ?? null;
+  }
 
   async list(
     query: DocumentQuery,

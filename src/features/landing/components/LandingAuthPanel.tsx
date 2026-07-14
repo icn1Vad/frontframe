@@ -8,11 +8,8 @@ import {
   useState,
 } from "react";
 import { routes } from "../../../app/routes";
-import {
-  type AuthMode,
-  mockAuthApi,
-  type RequestedRole,
-} from "../../auth";
+import { appServices } from "../../../app/services";
+import { type AuthMode, type RequestedRole } from "../../auth";
 
 interface Feedback {
   readonly kind: "success" | "info" | "error";
@@ -94,7 +91,7 @@ export function LandingAuthPanel() {
 
     try {
       if (mode === "login") {
-        const result = await mockAuthApi.login({ username, password });
+        const result = await appServices.auth.login({ username, password });
         setFeedback({ kind: "success", message: result.message });
         await router.push(routes.dashboard);
         return;
@@ -103,7 +100,7 @@ export function LandingAuthPanel() {
       const requestedRole = String(
         formData.get("requestedRole") ?? "user",
       ) as RequestedRole;
-      const result = await mockAuthApi.register({
+      const result = await appServices.auth.register({
         username,
         password,
         requestedRole,

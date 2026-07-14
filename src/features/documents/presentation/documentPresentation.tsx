@@ -85,6 +85,7 @@ export interface DocumentColumnOptions {
   timeHeader: string;
   operatorHeader: string;
   renderTime?: (document: DocumentSummary) => React.ReactNode;
+  renderStatus?: (document: DocumentSummary) => React.ReactNode;
 }
 
 export function createDocumentColumns({
@@ -94,6 +95,11 @@ export function createDocumentColumns({
     <strong>
       {formatDocumentDateTime(getDocumentStateTimestamp(document.state))}
     </strong>
+  ),
+  renderStatus = (document) => (
+    <Status tone={getDocumentStateTone(document.state)}>
+      {getDocumentStateLabel(document.state)}
+    </Status>
   ),
 }: DocumentColumnOptions): readonly DataGridColumn<DocumentSummary>[] {
   return [
@@ -130,11 +136,7 @@ export function createDocumentColumns({
       id: "status",
       header: "状态",
       width: 140,
-      cell: (document) => (
-        <Status tone={getDocumentStateTone(document.state)}>
-          {getDocumentStateLabel(document.state)}
-        </Status>
-      ),
+      cell: renderStatus,
     },
     {
       id: "time",
