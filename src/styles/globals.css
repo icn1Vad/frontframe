@@ -735,7 +735,8 @@ button:disabled { cursor: not-allowed; }
   text-transform: uppercase;
 }
 .landing-auth-card {
-  width: 100%;
+  width: min(100%, 540px);
+  margin: 0 auto;
   padding: clamp(24px, 4vw, 38px);
   color: var(--landing-ink);
   background: rgba(255, 252, 246, .72);
@@ -841,9 +842,13 @@ button:disabled { cursor: not-allowed; }
 }
 .landing-auth-switch:not(:disabled):hover { color: #9f432f; }
 
+@media (min-width: 1024px) {
+  .landing-auth-column { min-height: 640px; }
+}
+
 @media (max-width: 1023px) {
   .landing-experience-copy { max-width: 700px; }
-  .landing-auth-card { max-width: 620px; }
+  .landing-auth-column { width: 100%; }
 }
 
 @media (max-width: 768px) {
