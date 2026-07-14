@@ -82,7 +82,9 @@ export function DataGrid<T>({
       aria-busy={loading}
       aria-colcount={columns.length}
       aria-rowcount={stateContent === null ? rows.length + 1 : 2}
+      data-state={stateKind ?? "ready"}
       style={gridStyle}
+      tabIndex={0}
     >
       <div className="data-grid-inner">
         <div
@@ -93,6 +95,7 @@ export function DataGrid<T>({
           {columns.map((column) => (
             <span
               className={classNames("filter-label", column.headerClassName)}
+              data-column-id={column.id}
               role="columnheader"
               key={column.id}
             >
@@ -127,7 +130,12 @@ export function DataGrid<T>({
               style={{ gridTemplateColumns: "var(--data-grid-columns)" }}
             >
               {columns.map((column) => (
-                <span className={column.className} role="cell" key={column.id}>
+                <span
+                  className={column.className}
+                  data-column-id={column.id}
+                  role="cell"
+                  key={column.id}
+                >
                   {column.cell(row)}
                 </span>
               ))}

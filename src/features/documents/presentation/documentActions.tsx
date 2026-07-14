@@ -52,6 +52,7 @@ export interface DocumentActionCellProps {
   document: DocumentSummary;
   actions: readonly DocumentActionDefinition[];
   commands?: DocumentCommandHandlers;
+  availableDialogs?: Partial<Record<DocumentDialogKind, boolean>>;
   openDialog: (state: Exclude<DocumentDialogState, null>) => void;
 }
 
@@ -68,10 +69,11 @@ export function DocumentActionCell({
   document,
   actions,
   commands = {},
+  availableDialogs = {},
   openDialog,
 }: DocumentActionCellProps) {
   return (
-    <span className="actions">
+    <span className="actions touch-actions">
       {actions.map((action) => {
         if (action.isVisible && !action.isVisible(document)) return null;
 
@@ -83,6 +85,7 @@ export function DocumentActionCell({
             <IconLink
               href={action.href(document)}
               label={label}
+              visibleLabel={label}
               danger={action.danger}
               key={action.id}
             >
@@ -92,10 +95,15 @@ export function DocumentActionCell({
         }
 
         if (action.type === "dialog") {
+          const isAvailable = availableDialogs[action.dialog] ?? true;
+          const unavailableReason = `${label}功能需要先接入后端接口`;
           return (
             <IconButton
-              label={label}
+              label={isAvailable ? label : unavailableReason}
+              visibleLabel={isAvailable ? label : `${label}待接入`}
               danger={action.danger}
+              disabled={!isAvailable}
+              title={isAvailable ? label : unavailableReason}
               onClick={() =>
                 openDialog({
                   kind: action.dialog,
@@ -110,11 +118,14 @@ export function DocumentActionCell({
         }
 
         const handler = commands[action.command];
+        const unavailableReason = `${label}功能需要先接入后端接口`;
         return (
           <IconButton
-            label={label}
+            label={handler ? label : unavailableReason}
+            visibleLabel={handler ? label : `${label}待接入`}
             danger={action.danger}
             disabled={!handler}
+            title={handler ? label : unavailableReason}
             onClick={() => handler?.(document.id)}
             key={action.id}
           >

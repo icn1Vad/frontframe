@@ -74,12 +74,13 @@ export function DocumentTableView({
     {
       id: "actions",
       header: "操作",
-      width: 280,
+      width: 248,
       cell: (document) => (
         <DocumentActionCell
           document={document}
           actions={actions}
-        commands={commandHandlers}
+          commands={commandHandlers}
+          availableDialogs={{ delete: Boolean(onDelete) }}
           openDialog={setDialog}
         />
       ),

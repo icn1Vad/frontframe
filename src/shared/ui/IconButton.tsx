@@ -8,6 +8,7 @@ import { classNames } from "../lib/classNames";
 
 interface IconControlProps {
   label: string;
+  visibleLabel?: string;
   children: ReactNode;
   danger?: boolean;
   className?: string;
@@ -18,6 +19,7 @@ export type IconButtonProps = ButtonHTMLAttributes<HTMLButtonElement> &
 
 export function IconButton({
   label,
+  visibleLabel,
   children,
   danger = false,
   className,
@@ -33,6 +35,11 @@ export function IconButton({
       {...props}
     >
       {children}
+      {visibleLabel ? (
+        <span className="icon-button-label" aria-hidden="true">
+          {visibleLabel}
+        </span>
+      ) : null}
     </button>
   );
 }
@@ -42,6 +49,7 @@ export type IconLinkProps = Omit<ComponentProps<typeof Link>, "children"> &
 
 export function IconLink({
   label,
+  visibleLabel,
   children,
   danger = false,
   className,
@@ -55,6 +63,11 @@ export function IconLink({
       {...props}
     >
       {children}
+      {visibleLabel ? (
+        <span className="icon-button-label" aria-hidden="true">
+          {visibleLabel}
+        </span>
+      ) : null}
     </Link>
   );
 }

@@ -144,14 +144,22 @@ export function AppShell({
               <p>{subtitle}</p>
             </div>
             {session.signOut ? (
-              <button type="button" className="account" onClick={session.signOut}>
+              <button
+                type="button"
+                className="account"
+                aria-label={`退出登录，当前用户：${session.user.displayName}`}
+                title="退出登录"
+                onClick={session.signOut}
+              >
                 {session.user.displayName} - {session.user.roleLabel}
                 <LogOut size={16} />
               </button>
             ) : (
-              <div className="account">
+              <div
+                className="account account-readonly"
+                aria-label={`当前用户：${session.user.displayName}，${session.user.roleLabel}`}
+              >
                 {session.user.displayName} - {session.user.roleLabel}
-                <LogOut size={16} aria-hidden="true" />
               </div>
             )}
           </header>

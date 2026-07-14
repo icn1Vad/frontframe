@@ -27,6 +27,8 @@ export function Pagination({
   const canGoPrevious = !disabled && safePage > 1;
   const canGoNext = !disabled && safePage > 0 && safePage < safePageCount;
 
+  if (safePageCount <= 1) return null;
+
   return (
     <nav
       className={classNames("pagination", className)}
