@@ -47,7 +47,7 @@ export function HeroSection() {
 
   return (
     <section
-      className="relative flex min-h-[100svh] scroll-mt-24 items-start overflow-hidden px-5 pb-16 pt-28 md:px-8 md:pb-20 md:pt-32"
+      className="landing-fullpage-section landing-hero-section relative flex min-h-[100svh] scroll-mt-24 items-start overflow-hidden px-5 pb-16 pt-28 md:px-8 md:pb-20 md:pt-32"
       id="product"
     >
       <div className="paper-noise" />
@@ -114,7 +114,7 @@ export function HeroSection() {
 
         <motion.div
           animate={{ opacity: 1, scale: 1 }}
-          className="relative h-[500px] overflow-visible md:h-[600px] lg:-mt-2 lg:h-[640px]"
+          className="landing-hero-visual relative h-[500px] overflow-visible md:h-[600px] lg:-mt-2 lg:h-[640px]"
           initial={{ opacity: 0, scale: 0.96 }}
           transition={{ duration: 0.9, delay: 0.24, ease: smoothEase }}
         >

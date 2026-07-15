@@ -61,7 +61,7 @@ export function TechSection() {
 
   return (
     <section
-      className="relative flex min-h-[100svh] scroll-mt-24 items-start overflow-hidden border-t border-line/65 px-5 py-20 md:px-8 md:py-24"
+      className="landing-fullpage-section landing-tech-section relative flex min-h-[100svh] scroll-mt-24 items-start overflow-hidden border-t border-line/65 px-5 py-20 md:px-8 md:py-24"
       id="technology"
     >
       <div className="paper-noise" />
@@ -107,7 +107,7 @@ export function TechSection() {
         </div>
 
         <motion.div
-          className="relative h-[390px] md:h-[560px] lg:h-[680px]"
+          className="landing-tech-visual relative h-[390px] md:h-[560px] lg:h-[680px]"
           initial={{ opacity: 0, x: 24 }}
           transition={{ duration: 0.85, ease: smoothEase }}
           viewport={{ once: true, amount: 0.25 }}
