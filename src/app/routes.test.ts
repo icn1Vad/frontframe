@@ -24,3 +24,11 @@ describe("routes.reviewReport", () => {
     );
   });
 });
+
+describe("routes.contractReviewTask", () => {
+  it("encodes the contract review task id as one path segment", () => {
+    expect(routes.contractReviewTask(" contract/task 中文 ")).toBe(
+      "/contract-review/tasks/contract%2Ftask%20%E4%B8%AD%E6%96%87/review",
+    );
+  });
+});

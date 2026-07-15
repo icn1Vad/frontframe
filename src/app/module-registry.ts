@@ -141,6 +141,7 @@ export function createModuleRegistry(
 const navigationSections = [
   { id: "workspace", order: 0 },
   { id: "governance", label: "文件分类审查", order: 10 },
+  { id: "contract-review", label: "合同审查", order: 15 },
   { id: "knowledge", order: 20 },
 ] as const satisfies readonly NavigationSectionDefinition[];
 
@@ -183,6 +184,24 @@ export const coreModules = defineModules([
   },
   {
     apiVersion: 1,
+    id: "contractReview",
+    route: routes.contractReview,
+    title: "合同审查 / 上传与配置",
+    subtitle: "上传合同、选择审查立场和检查模块，确认后进入合同审查任务池",
+    navigation: { label: "上传合同", sectionId: "contract-review", order: 0, prefetch: true },
+    requiredPermissions: ["contracts:write"],
+  },
+  {
+    apiVersion: 1,
+    id: "contractReviewTasks",
+    route: routes.contractReviewTasks,
+    title: "合同审查 / 任务池",
+    subtitle: "开始审查、查看报告并处理合同风险",
+    navigation: { label: "合同审查任务池", sectionId: "contract-review", order: 10, prefetch: true },
+    requiredPermissions: ["contracts:write"],
+  },
+  {
+    apiVersion: 1,
     id: "knowledge",
     route: routes.knowledge,
     title: "知识库",
@@ -206,6 +225,14 @@ export const coreModules = defineModules([
     title: "审查报告",
     subtitle: "查看审查结论、风险项和检测细节",
     requiredPermissions: ["reviews:read"],
+  },
+  {
+    apiVersion: 1,
+    id: "contractReviewWorkbench",
+    route: "/contract-review/tasks/[taskId]/review",
+    title: "合同审查工作台",
+    subtitle: "对照原文查看风险、解析合同并进行实时问答",
+    requiredPermissions: ["contracts:read"],
   },
 ] as const);
 

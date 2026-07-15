@@ -1,5 +1,7 @@
 import type { AuthApi } from "../features/auth";
 import { mockAuthApi } from "../features/auth";
+import type { ContractReviewApi } from "../features/contracts/application";
+import { mockContractReviewApi } from "../features/contracts/infrastructure";
 import type {
   ClassificationTaskPoolApi,
   ClassificationWorkflowApi,
@@ -47,6 +49,7 @@ export interface AppServices {
   readonly classification: ClassificationWorkflowApi;
   readonly classificationTasks: ClassificationTaskPoolApi;
   readonly reviewTasks: ReviewTaskPoolApi;
+  readonly contractReview: ContractReviewApi;
   readonly documents: DocumentRepository;
   readonly knowledge: KnowledgeApi;
   readonly chat: ChatApi;
@@ -102,6 +105,7 @@ export const appServices: AppServices = Object.freeze({
   classification,
   classificationTasks,
   reviewTasks,
+  contractReview: mockContractReviewApi,
   documents: mockDocumentRepository,
   knowledge,
   chat,
