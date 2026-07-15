@@ -18,9 +18,9 @@ import {
   type ReviewTaskId,
 } from "../domain";
 
-const operatorYan = {
-  id: createUserId("user_yan_kaifeng"),
-  displayName: "严凯丰",
+const operatorZhang = {
+  id: createUserId("user_zhang_san"),
+  displayName: "张三",
 } as const;
 
 const operatorLi = {
@@ -39,7 +39,7 @@ const classifiedContract = {
     source: "classification",
     publishedAt: createIsoDateTime("2026-07-05T10:30:00+08:00"),
   },
-  operator: operatorYan,
+  operator: operatorZhang,
 } as const satisfies DocumentSummary;
 
 const reviewedPurchasePolicy = {
@@ -54,7 +54,7 @@ const reviewedPurchasePolicy = {
     reviewTaskId: createReviewTaskId("review_purchase_policy_approved_v1"),
     publishedAt: createIsoDateTime("2026-07-05T14:40:00+08:00"),
   },
-  operator: operatorYan,
+  operator: operatorZhang,
 } as const satisfies DocumentSummary;
 
 const classifiedRegulations = {
@@ -68,7 +68,7 @@ const classifiedRegulations = {
     source: "classification",
     publishedAt: createIsoDateTime("2026-07-04T10:18:00+08:00"),
   },
-  operator: operatorYan,
+  operator: operatorZhang,
 } as const satisfies DocumentSummary;
 
 export const mockDocumentCollections = {
@@ -83,7 +83,7 @@ export const mockDocumentCollections = {
         kind: "pending",
         queuedAt: createIsoDateTime("2026-07-05T10:24:00+08:00"),
       },
-      operator: operatorYan,
+      operator: operatorZhang,
     },
     classifiedContract,
     {
@@ -98,7 +98,7 @@ export const mockDocumentCollections = {
         startedAt: createIsoDateTime("2026-07-05T10:41:00+08:00"),
         progress: createReviewProgress(0),
       },
-      operator: operatorYan,
+      operator: operatorZhang,
     },
     {
       id: createDocumentId("doc_legacy_policy_v1"),
@@ -129,7 +129,7 @@ export const mockDocumentCollections = {
         startedAt: createIsoDateTime("2026-07-05T11:38:00+08:00"),
         progress: createReviewProgress(30),
       },
-      operator: operatorYan,
+      operator: operatorZhang,
     },
     {
       id: createDocumentId("doc_supplier_policy_v1"),
@@ -142,7 +142,7 @@ export const mockDocumentCollections = {
         reviewTaskId: createReviewTaskId("review_supplier_policy_v1"),
         reviewedAt: createIsoDateTime("2026-07-05T12:08:00+08:00"),
       },
-      operator: operatorYan,
+      operator: operatorZhang,
     },
     {
       id: createDocumentId("doc_xx_project_contract_review_v2"),
@@ -156,7 +156,7 @@ export const mockDocumentCollections = {
         reviewTaskId: createReviewTaskId("review_xx_project_contract_v2"),
         publishedAt: createIsoDateTime("2026-07-04T18:20:00+08:00"),
       },
-      operator: operatorYan,
+      operator: operatorZhang,
     },
     {
       id: createDocumentId("doc_legacy_policy_review_v2"),
@@ -171,7 +171,7 @@ export const mockDocumentCollections = {
         reviewTaskId: createReviewTaskId("review_legacy_policy_v2"),
         reason: "user-action",
       },
-      operator: operatorYan,
+      operator: operatorZhang,
     },
     reviewedPurchasePolicy,
   ],

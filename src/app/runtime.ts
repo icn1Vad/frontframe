@@ -9,7 +9,7 @@ export interface AppSession {
 /** Demo composition value. Replace this object when the authentication port is connected. */
 export const demoSession: AppSession = {
   user: {
-    displayName: "严凯丰",
+    displayName: "张三",
     roleLabel: "管理员",
   },
   signOut() {

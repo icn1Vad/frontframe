@@ -30,8 +30,8 @@ import {
 import { MockDocumentRepository } from "./mockDocumentRepository";
 
 const operator = {
-  id: createUserId("user_yan_kaifeng"),
-  displayName: "严凯丰",
+  id: createUserId("user_zhang_san"),
+  displayName: "张三",
 } as const;
 
 const previewContent =
