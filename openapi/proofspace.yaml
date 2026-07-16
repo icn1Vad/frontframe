@@ -113,7 +113,7 @@ paths:
       operationId: getDashboardOverview
       responses:
         '200':
-          description: 工作台待办和资产统计
+          description: 工作台资产统计
           content:
             application/json:
               schema:
@@ -1210,32 +1210,11 @@ components:
         value:
           type: string
 
-    DashboardTodo:
-      type: object
-      additionalProperties: false
-      required: [kind, count]
-      properties:
-        kind:
-          type: string
-          enum:
-            - classification-confirmation
-            - classification-task
-            - review-progress
-            - review-report
-            - contract-review
-        count:
-          type: integer
-          minimum: 0
-
     DashboardOverview:
       type: object
       additionalProperties: false
-      required: [todos, metrics]
+      required: [metrics]
       properties:
-        todos:
-          type: array
-          items:
-            $ref: '#/components/schemas/DashboardTodo'
         metrics:
           type: array
           items:

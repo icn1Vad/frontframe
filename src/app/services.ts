@@ -24,15 +24,6 @@ import {
 } from "../features/documents/domain";
 
 export interface DashboardOverview {
-  readonly todos: readonly {
-    readonly kind:
-      | "classification-confirmation"
-      | "classification-task"
-      | "review-progress"
-      | "review-report"
-      | "contract-review";
-    readonly count: number;
-  }[];
   readonly metrics: readonly {
     readonly label: string;
     readonly value: string;
@@ -126,13 +117,6 @@ const contractReview: ContractReviewApi = {
 const dashboard: DashboardApi = {
   async getOverview() {
     return {
-      todos: [
-        { kind: "classification-confirmation", count: 8 },
-        { kind: "classification-task", count: 5 },
-        { kind: "review-progress", count: 3 },
-        { kind: "review-report", count: 2 },
-        { kind: "contract-review", count: 1 },
-      ],
       metrics: [
         { label: "已入库制度", value: "1,284" },
         { label: "已入库合同", value: "8,426" },

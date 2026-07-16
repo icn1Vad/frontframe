@@ -179,7 +179,7 @@ GET /api/v1/classification/candidates?state=classifying&state=awaiting-confirmat
 | POST | `/auth/registrations` | 公开 | 提交账号申请 |
 | GET | `/auth/session` | 可匿名 | 获取当前会话和 CSRF Token |
 | POST | `/auth/logout` | 已登录 | 清除会话 Cookie |
-| GET | `/dashboard/overview` | `dashboard:read` | 工作台待办数量和资产统计 |
+| GET | `/dashboard/overview` | `dashboard:read` | 工作台资产统计 |
 
 ### 4.2 上传
 

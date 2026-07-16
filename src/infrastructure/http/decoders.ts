@@ -625,34 +625,6 @@ export function decodeContractEditorSession(value: unknown) {
 export function decodeDashboardOverview(value: unknown): DashboardOverview {
   const input = record(value, "dashboardOverview");
   return {
-    todos: array(input.todos, "dashboardOverview.todos").map(
-      (todo, index) => {
-        const item = record(todo, `dashboardOverview.todos[${index}]`);
-        const count = number(
-          item.count,
-          `dashboardOverview.todos[${index}].count`,
-        );
-        if (!Number.isInteger(count) || count < 0) {
-          throw new ResponseValidationError(
-            `dashboardOverview.todos[${index}].count 必须是非负整数`,
-          );
-        }
-        return {
-          kind: oneOf(
-            item.kind,
-            [
-              "classification-confirmation",
-              "classification-task",
-              "review-progress",
-              "review-report",
-              "contract-review",
-            ] as const,
-            `dashboardOverview.todos[${index}].kind`,
-          ),
-          count,
-        };
-      },
-    ),
     metrics: array(input.metrics, "dashboardOverview.metrics").map(
       (metric, index) => {
         const item = record(metric, `dashboardOverview.metrics[${index}]`);

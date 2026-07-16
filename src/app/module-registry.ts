@@ -151,7 +151,7 @@ export const coreModules = defineModules([
     id: "dashboard",
     route: routes.dashboard,
     title: "工作台",
-    subtitle: "集中处理待办任务，快速进入文件治理流程",
+    subtitle: "治理概览、文件资产与审查流程总览",
     navigation: { label: "工作台", sectionId: "workspace", order: 0, prefetch: true },
     requiredPermissions: ["dashboard:read"],
   },
