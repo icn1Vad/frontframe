@@ -152,8 +152,11 @@ GET /api/v1/classification/candidates?state=classifying&state=awaiting-confirmat
 
 ### 3.4 幂等与并发
 
-- 所有业务资源创建、状态变更、删除和批量写操作必须携带
-  `Idempotency-Key`；登录、会话读取和退出除外。
+- 所有支持重试的业务资源创建、状态变更、删除和批量写操作必须携带
+  `Idempotency-Key`；登录、会话读取、退出和当前版本的公开注册接口除外。
+- 当前 `POST /auth/registrations` 不接收 `Idempotency-Key`，客户端不得对注册请求
+  做无条件自动重试；如后端将注册改为可幂等重试，必须同步更新 TypeScript 接口、
+  HTTP Adapter 和 OpenAPI 参数定义。
 - 同一用户、同一路径和同一幂等键必须返回第一次成功响应。
 - 相同幂等键但请求体不同，返回 `409 IDEMPOTENCY_CONFLICT`。
 - 分类候选人工确认通过请求体中的 `expectedVersion` 进行乐观锁校验。
@@ -240,7 +243,17 @@ GET /api/v1/classification/candidates?state=classifying&state=awaiting-confirmat
 | PATCH | `/contract-review/tasks/{taskId}/risks/{riskId}` | `contracts:write` | 处理、忽略或撤销风险 |
 | POST | `/contract-review/tasks/{taskId}/store` | `contracts:write` | 入库并创建公共知识条目 |
 
-### 4.7 知识库
+### 4.7 通用文档资源
+
+| Method | Path | 权限 | 用途 |
+|---|---|---|---|
+| GET | `/documents/{documentId}` | 所属资源的读取权限 | 获取文档摘要；无权访问或不存在时 `data` 为 `null` |
+
+该端点对应前端 `DocumentRepository.getById()`，用于在跨模块场景下按文档 ID
+获取统一的 `DocumentSummary`。它不替代分类任务、通用审查任务或知识库的专用
+列表端点；后端仍需根据文档来源执行资源级权限校验。
+
+### 4.8 知识库
 
 | Method | Path | 权限 | 用途 |
 |---|---|---|---|
@@ -250,7 +263,7 @@ GET /api/v1/classification/candidates?state=classifying&state=awaiting-confirmat
 | GET | `/knowledge/{documentId}/report` | `knowledge:read` | 查看通用审查报告摘要 |
 | DELETE | `/knowledge/{documentId}` | `knowledge:write` | 删除知识并执行来源级联 |
 
-### 4.8 智能问答
+### 4.9 智能问答
 
 | Method | Path | 权限 | 用途 |
 |---|---|---|---|

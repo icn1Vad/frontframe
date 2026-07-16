@@ -175,6 +175,8 @@ paths:
           $ref: '#/components/responses/NotFoundProblem'
         '409':
           $ref: '#/components/responses/ConflictProblem'
+
+  /uploads/{uploadId}:
     delete:
       tags: [Uploads]
       operationId: abandonUpload
