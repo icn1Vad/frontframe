@@ -100,16 +100,18 @@ export function DashboardScreen({ overview }: DashboardScreenProps) {
               {row.category}
             </strong>
             {flowColumns.map((column) => (
-              <span role="cell" key={column.id}>
+              <Link
+                className="flow-cell-link"
+                href={column.href}
+                role="cell"
+                aria-label={`${row.category}${column.label}${row[column.id]}项，前往${column.action}`}
+                key={column.id}
+              >
                 <b className="flow-count">
                   <strong>{row[column.id]}</strong>
                   <small>项</small>
                 </b>
-                <Link className="flow-cell-link" href={column.href}>
-                  {column.action}
-                  <ArrowRight size={13} />
-                </Link>
-              </span>
+              </Link>
             ))}
           </div>
         ))}
