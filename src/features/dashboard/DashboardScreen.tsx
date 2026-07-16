@@ -29,20 +29,14 @@ const flowColumns = [
   {
     id: "pending",
     label: "待审查",
-    href: routes.classificationTasks,
-    action: "分类任务池",
   },
   {
     id: "reviewing",
     label: "审查中",
-    href: routes.reviewTasks,
-    action: "审查任务池",
   },
   {
     id: "reviewed",
     label: "已审查",
-    href: routes.reviewTasks,
-    action: "审查任务池",
   },
 ] as const;
 
@@ -68,17 +62,13 @@ export function DashboardScreen({ overview }: DashboardScreenProps) {
           {overview.metrics.map(({ label, value }, index) => {
             const MetricIcon = metricIcons[index % metricIcons.length] ?? Archive;
             return (
-              <Link className="metric-card" href={routes.knowledge} key={label}>
+              <Surface className="metric-card" key={label}>
                 <span className="metric-card-icon" aria-hidden="true">
                   <MetricIcon />
                 </span>
                 <span className="metric-card-label">{label}</span>
                 <strong>{value}</strong>
-                <small>
-                  查看资产
-                  <ArrowRight size={13} />
-                </small>
-              </Link>
+              </Surface>
             );
           })}
         </StatGrid>
@@ -90,10 +80,6 @@ export function DashboardScreen({ overview }: DashboardScreenProps) {
             <h2>审查流程概览</h2>
             <p>按文件类别查看待审查、审查中和已审查任务。</p>
           </div>
-          <Link href={routes.reviewTasks}>
-            查看全部任务
-            <ArrowRight size={14} />
-          </Link>
         </header>
         <div className="flow-row head" role="row">
           <span role="columnheader">类别 / 流程</span>
@@ -113,10 +99,6 @@ export function DashboardScreen({ overview }: DashboardScreenProps) {
                   {row[column.id]}
                   <small>项</small>
                 </b>
-                <Link href={column.href}>
-                  {column.action}
-                  <ArrowRight size={13} />
-                </Link>
               </span>
             ))}
           </div>
