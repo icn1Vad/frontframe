@@ -57,6 +57,7 @@ export interface DocumentActionCellProps {
     readonly documentId: DocumentId;
     readonly command: DocumentCommand;
   } | null;
+  showLabels?: boolean;
   openDialog: (state: Exclude<DocumentDialogState, null>) => void;
 }
 
@@ -75,6 +76,7 @@ export function DocumentActionCell({
   commands = {},
   availableDialogs = {},
   pendingCommand = null,
+  showLabels = false,
   openDialog,
 }: DocumentActionCellProps) {
   return (
@@ -90,6 +92,7 @@ export function DocumentActionCell({
             <IconLink
               href={action.href(document)}
               label={label}
+              visibleLabel={showLabels ? label : undefined}
               danger={action.danger}
               key={action.id}
             >
@@ -100,13 +103,13 @@ export function DocumentActionCell({
 
         if (action.type === "dialog") {
           const isAvailable = availableDialogs[action.dialog] ?? true;
-          const unavailableReason = `${label}功能需要先接入后端接口`;
+          if (!isAvailable) return null;
           return (
             <IconButton
-              label={isAvailable ? label : unavailableReason}
+              label={label}
+              visibleLabel={showLabels ? label : undefined}
               danger={action.danger}
-              disabled={!isAvailable}
-              title={isAvailable ? label : unavailableReason}
+              title={label}
               onClick={() =>
                 openDialog({
                   kind: action.dialog,
@@ -124,14 +127,15 @@ export function DocumentActionCell({
         const pending =
           pendingCommand?.documentId === document.id &&
           pendingCommand.command === action.command;
-        const unavailableReason = `${label}功能需要先接入后端接口`;
+        if (!handler) return null;
         return (
           <IconButton
-            label={pending ? `${label}中` : handler ? label : unavailableReason}
+            label={pending ? `${label}中` : label}
+            visibleLabel={showLabels ? (pending ? `${label}中` : label) : undefined}
             danger={action.danger}
-            disabled={!handler || Boolean(pendingCommand)}
+            disabled={Boolean(pendingCommand)}
             aria-busy={pending}
-            title={pending ? `${label}中` : handler ? label : unavailableReason}
+            title={pending ? `${label}中` : label}
             onClick={() => handler?.(document.id)}
             key={action.id}
           >

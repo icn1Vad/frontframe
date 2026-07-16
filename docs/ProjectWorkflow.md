@@ -18,12 +18,29 @@ flowchart TD
   Reviewing -->|"完成"| Reviewed["审查任务池：已审查"]
   Reviewing -->|"删除"| Termination["生成终止报告"]
   Termination --> ReviewDeleted["审查任务池：已删除"]
-  Reviewed -->|"忽略全部风险：二次确认"| Reviewed
+  Reviewed -->|"逐项处理 / 填写理由后忽略"| Reviewed
+  Reviewed -->|"忽略全部待处理风险：次要操作 + 必填理由"| Reviewed
   Reviewed -->|"入库"| ReviewPublished["审查任务池：已审查入库"]
   ReviewPublished --> KnowledgeReviewed["知识库：已审查入库"]
   KnowledgeClassified -->|"删除"| SourceDelete["知识删除并软删除分类来源任务"]
   KnowledgeReviewed -->|"删除"| SourceDeleteReview["知识删除并软删除审查来源任务"]
 ```
+
+## 合同专项审查验证链路
+
+当前产品最终流程仍然是：
+
+```text
+统一上传 → 文件分类 → 根据文件类型进入对应处理流程
+```
+
+合同审查页面是从上述流程中单独抽出的条款级专项审查验证链路，用于独立验证合同解析、原文定位、风险处置、修订和报告能力。当前合同入口无需先经过文件分类，但这不是最终信息架构。
+
+- 用户界面继续保留“文件分类审查”和“合同审查”的现有一级、二级标题。
+- 页面不展示“测试链路、模拟服务、接口占位”等开发说明。
+- 合同专项审查完成后进入公共知识库，知识条目标记为“合同审查入库”。
+- 合同任务不重复进入通用审查任务池。
+- 正式统一上传实施时，再统一调整标题、导航、流程文档和路由说明。
 
 ## 页面状态与操作矩阵
 
@@ -41,6 +58,7 @@ flowchart TD
 | 审查任务池 | 已删除 | 查看报告 |
 | 知识库 | 已分类入库 | 预览、删除 |
 | 知识库 | 已审查入库 | 查看报告、删除 |
+| 知识库 | 合同审查入库 | 查看合同报告、删除 |
 
 行操作统一为纯图标，桌面通过 `title` 提示，所有尺寸通过 `aria-label` 提供可访问名称；移动端点击区域不小于 44px。批量操作仅作用于当前页，保留“图标 + 文字”。
 
@@ -64,6 +82,7 @@ interface AppServices {
   classification: ClassificationWorkflowApi;
   classificationTasks: ClassificationTaskPoolApi;
   reviewTasks: ReviewTaskPoolApi;
+  contractReview: ContractReviewApi;
   documents: DocumentRepository;
   knowledge: KnowledgeApi;
   chat: ChatApi;

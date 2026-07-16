@@ -113,7 +113,7 @@ export function ContractReviewTasksScreen({ api }: ContractReviewTasksScreenProp
         </div>
       </PageToolbar>
       <StatGrid className="contract-stats-row">
-        <Surface><span>合同任务总数</span><strong>{counts.total}</strong><small>独立于文件分类任务</small></Surface>
+        <Surface><span>合同任务总数</span><strong>{counts.total}</strong><small>条款级专项审查记录</small></Surface>
         <Surface><span>待开始</span><strong>{counts.queued}</strong><small>等待人工启动审查</small></Surface>
         <Surface><span>审查中</span><strong>{counts.reviewing}</strong><small>系统正在生成分析</small></Surface>
         <Surface><span>待处理报告</span><strong>{counts.reported}</strong><small>需要人工确认风险</small></Surface>

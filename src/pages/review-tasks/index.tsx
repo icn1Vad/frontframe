@@ -30,7 +30,20 @@ const ReviewTasks: AppPage<ReviewTasksProps> = function ReviewTasks({ result }) 
   const router = useRouter();
   const [rows, setRows] = useState(result.items);
 
-  useEffect(() => setRows(result.items), [result.items]);
+  useEffect(() => {
+    let active = true;
+    setRows(result.items);
+    void appServices.reviewTasks.list({
+      page: result.page,
+      pageSize: result.pageSize,
+      sort: { by: "updatedAt", direction: "desc" },
+    }).then((clientResult) => {
+      if (active) setRows(clientResult.items);
+    });
+    return () => {
+      active = false;
+    };
+  }, [result]);
 
   const replaceRow = (updated: DocumentSummary) => {
     setRows((current) =>

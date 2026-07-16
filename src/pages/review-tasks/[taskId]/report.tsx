@@ -1,4 +1,5 @@
 import type { GetServerSideProps } from "next";
+import { useEffect, useState } from "react";
 import {
   appServices,
   definePageConfig,
@@ -7,6 +8,7 @@ import {
 import {
   createReviewTaskId,
   type DocumentId,
+  type ReviewReport,
   type ReviewTaskId,
 } from "../../../features/documents";
 import { ReviewReportScreen } from "../../../features/reviews";
@@ -16,27 +18,69 @@ interface ReviewReportPageProps {
   readonly taskId: string;
   readonly documentId: DocumentId;
   readonly documentName: string;
+  readonly initialReport: ReviewReport | null;
+  readonly initialReadOnly: boolean;
 }
 
 const ReviewReportPage: AppPage<ReviewReportPageProps> =
   function ReviewReportPage(props) {
     const taskId = createReviewTaskId(props.taskId);
+    const [report, setReport] = useState(props.initialReport);
+    const [readOnly, setReadOnly] = useState(props.initialReadOnly);
+    const [loading, setLoading] = useState(props.initialReport === null);
+
+    useEffect(() => {
+      let active = true;
+      void Promise.all([
+        appServices.reviewTasks.getReport(taskId),
+        appServices.documents.getByReviewTaskId(taskId),
+      ]).then(([nextReport, document]) => {
+        if (!active) return;
+        setReport(nextReport);
+        setReadOnly(document?.state.kind !== "reviewed");
+        setLoading(false);
+      });
+      return () => {
+        active = false;
+      };
+    }, [taskId]);
+
+    if (loading) {
+      return <div className="table-state">正在加载审查报告…</div>;
+    }
+    if (!report) {
+      return <div className="table-state">审查报告尚未生成</div>;
+    }
+
     return (
       <ReviewReportScreen
         {...props}
-        onExportReport={async () => {
-          await appServices.reviewTasks.getReport(taskId);
+        initialReport={report}
+        readOnly={readOnly}
+        onResolveRisk={async (riskId) => {
+          return appServices.reviewTasks.resolveRisk(taskId, riskId, {
+            idempotencyKey: createIdempotencyKey("resolve-review-risk"),
+          });
         }}
-        onIgnoreAllRisks={async () => {
-          await appServices.reviewTasks.ignoreAllRisks(taskId, {
+        onIgnoreRisk={async (riskId, reason) => {
+          return appServices.reviewTasks.ignoreRisk(taskId, riskId, reason ?? "", {
+            idempotencyKey: createIdempotencyKey("ignore-review-risk"),
+          });
+        }}
+        onIgnoreAllRisks={async (reason) => {
+          return appServices.reviewTasks.ignoreAllRisks(taskId, reason, {
             idempotencyKey: createIdempotencyKey("ignore-review-risks"),
           });
         }}
-        onPublish={async () => {
-          await appServices.reviewTasks.publish(props.documentId, {
-            idempotencyKey: createIdempotencyKey("publish-review-report"),
-          });
-        }}
+        onPublish={
+          readOnly
+            ? undefined
+            : async () => {
+                await appServices.reviewTasks.publish(props.documentId, {
+                  idempotencyKey: createIdempotencyKey("publish-review-report"),
+                });
+              }
+        }
       />
     );
   };
@@ -61,12 +105,15 @@ export const getServerSideProps: GetServerSideProps<
 
   const document = await appServices.documents.getByReviewTaskId(taskId);
   if (!document) return { notFound: true };
+  const initialReport = await appServices.reviewTasks.getReport(taskId);
 
   return {
     props: {
       taskId,
       documentId: document.id,
       documentName: document.name,
+      initialReport,
+      initialReadOnly: document.state.kind !== "reviewed",
     },
   };
 };

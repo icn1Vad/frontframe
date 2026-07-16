@@ -125,7 +125,11 @@ describe("task pool deletion semantics", () => {
       previousKind: "reviewing",
       reviewTaskId,
     });
-    expect(report?.content).toContain("30%");
+    expect(report?.termination).toMatchObject({
+      progress: 30,
+      discoveredRiskCount: 2,
+      operator: "张三",
+    });
   });
 
   it("soft-deletes the direct source task when published knowledge is deleted", async () => {
@@ -145,5 +149,54 @@ describe("task pool deletion semantics", () => {
     expect(
       repository.getFromCollection("classification", documentId)?.state,
     ).toMatchObject({ kind: "deleted", reason: "knowledge-deleted" });
+  });
+});
+
+describe("review report risk workflow", () => {
+  it("requires reasons for ignored risks and blocks publishing until every risk is handled", async () => {
+    const repository = new MockDocumentRepository();
+    const api = new MockReviewTaskPoolApi(repository);
+    const documentId = createDocumentId("doc_supplier_policy_v1");
+    const reviewTaskId = createReviewTaskId("review_supplier_policy_v1");
+    const initialReport = await api.getReport(reviewTaskId);
+    const firstRiskId = initialReport?.risks[0]?.id;
+
+    expect(firstRiskId).toBeTruthy();
+    await expect(
+      api.ignoreRisk(reviewTaskId, firstRiskId!, "", {
+        idempotencyKey: "ignore-without-reason",
+      }),
+    ).rejects.toThrow("必须填写理由");
+    await expect(
+      api.publish(documentId, { idempotencyKey: "publish-before-handled" }),
+    ).rejects.toThrow("仍有风险未处理");
+
+    await api.resolveRisk(reviewTaskId, firstRiskId!, {
+      idempotencyKey: "resolve-first-risk",
+    });
+    const handledReport = await api.ignoreAllRisks(
+      reviewTaskId,
+      "已完成业务复核并接受剩余风险",
+      { idempotencyKey: "ignore-remaining-risks" },
+    );
+    const published = await api.publish(documentId, {
+      idempotencyKey: "publish-after-handled",
+    });
+
+    expect(handledReport.risks.every((risk) => risk.state !== "open")).toBe(true);
+    expect(published.state).toMatchObject({
+      kind: "published",
+      source: "review",
+      reviewTaskId,
+    });
+    expect(repository.getFromCollection("knowledge", documentId)).not.toBeNull();
+  });
+
+  it("returns relationships for the knowledge graph", async () => {
+    const knowledge = new MockKnowledgeApi(new MockDocumentRepository());
+    const graph = await knowledge.getGraph();
+
+    expect(graph.nodes.length).toBeGreaterThan(1);
+    expect(graph.edges.length).toBe(graph.nodes.length - 1);
   });
 });

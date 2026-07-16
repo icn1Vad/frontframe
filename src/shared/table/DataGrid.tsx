@@ -22,6 +22,7 @@ export interface DataGridProps<T> {
   className?: string;
   rowClassName?: string | ((row: T) => string | undefined);
   ariaLabel?: string;
+  renderMobileCard?: (row: T) => ReactNode;
 }
 
 function defaultErrorContent(error: unknown): ReactNode {
@@ -50,6 +51,7 @@ export function DataGrid<T>({
   className,
   rowClassName,
   ariaLabel = "数据表格",
+  renderMobileCard,
 }: DataGridProps<T>) {
   const columnTemplate = columns.map(getColumnWidth).join(" ");
   const numericWidth = columns.every((column) => typeof column.width === "number")
@@ -76,17 +78,24 @@ export function DataGrid<T>({
 
   return (
     <div
-      className={classNames("data-table", "data-grid", className)}
-      role="table"
-      aria-label={ariaLabel}
-      aria-busy={loading}
-      aria-colcount={columns.length}
-      aria-rowcount={stateContent === null ? rows.length + 1 : 2}
+      className={classNames(
+        "data-table",
+        "data-grid",
+        renderMobileCard && "has-mobile-cards",
+        className,
+      )}
       data-state={stateKind ?? "ready"}
       style={gridStyle}
-      tabIndex={0}
     >
-      <div className="data-grid-inner">
+      <div
+        className="data-grid-inner"
+        role="table"
+        aria-label={ariaLabel}
+        aria-busy={loading}
+        aria-colcount={columns.length}
+        aria-rowcount={stateContent === null ? rows.length + 1 : 2}
+        tabIndex={0}
+      >
         <div
           className="table-row table-head"
           role="row"
@@ -143,6 +152,34 @@ export function DataGrid<T>({
           ))
         )}
       </div>
+      {renderMobileCard ? (
+        <div
+          className="data-grid-mobile-cards"
+          role="list"
+          aria-label={`${ariaLabel}（移动端）`}
+          aria-busy={loading}
+        >
+          {stateContent !== null ? (
+            <div
+              className="data-grid-mobile-state"
+              data-state={stateKind ?? undefined}
+              role="status"
+            >
+              {stateContent}
+            </div>
+          ) : (
+            rows.map((row) => (
+              <div
+                className="data-grid-mobile-card"
+                role="listitem"
+                key={getRowKey(row)}
+              >
+                {renderMobileCard(row)}
+              </div>
+            ))
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -18,6 +18,8 @@ import {
   type ReviewTaskId,
 } from "../domain";
 
+const documentStorageKey = "proofspace.documents.v2";
+
 const operatorZhang = {
   id: createUserId("user_zhang_san"),
   displayName: "张三",
@@ -30,7 +32,7 @@ const operatorLi = {
 
 const classifiedContract = {
   id: createDocumentId("doc_xx_project_contract_v1"),
-  name: "示例项目合同.pdf",
+  name: "星河项目服务合同.pdf",
   type: "contract",
   level: "department",
   category: "contract",
@@ -146,7 +148,7 @@ export const mockDocumentCollections = {
     },
     {
       id: createDocumentId("doc_xx_project_contract_review_v2"),
-      name: "示例项目合同.pdf",
+      name: "星河项目服务合同.pdf",
       type: "contract",
       level: "department",
       category: "contract",
@@ -181,6 +183,43 @@ export const mockDocumentCollections = {
     classifiedRegulations,
   ],
 } as const satisfies Record<DocumentCollection, readonly DocumentSummary[]>;
+
+function cloneCollections(
+  collections: Record<DocumentCollection, readonly DocumentSummary[]>,
+): Record<DocumentCollection, DocumentSummary[]> {
+  return {
+    classification: collections.classification.map((document) => ({ ...document })),
+    review: collections.review.map((document) => ({ ...document })),
+    knowledge: collections.knowledge.map((document) => ({ ...document })),
+  };
+}
+
+function readStoredCollections():
+  | Record<DocumentCollection, DocumentSummary[]>
+  | undefined {
+  if (typeof window === "undefined") return undefined;
+  const stored = window.localStorage.getItem(documentStorageKey);
+  if (!stored) return undefined;
+  try {
+    const parsed = JSON.parse(stored) as Partial<
+      Record<DocumentCollection, DocumentSummary[]>
+    >;
+    if (
+      Array.isArray(parsed.classification) &&
+      Array.isArray(parsed.review) &&
+      Array.isArray(parsed.knowledge)
+    ) {
+      return {
+        classification: parsed.classification,
+        review: parsed.review,
+        knowledge: parsed.knowledge,
+      };
+    }
+  } catch {
+    window.localStorage.removeItem(documentStorageKey);
+  }
+  return undefined;
+}
 
 function throwIfAborted(options?: RepositoryRequestOptions) {
   options?.signal?.throwIfAborted();
@@ -238,11 +277,7 @@ export class MockDocumentRepository implements DocumentRepository {
     collections: Record<DocumentCollection, readonly DocumentSummary[]> =
       mockDocumentCollections,
   ) {
-    this.collections = {
-      classification: [...collections.classification],
-      review: [...collections.review],
-      knowledge: [...collections.knowledge],
-    };
+    this.collections = readStoredCollections() ?? cloneCollections(collections);
   }
 
   getFromCollection(
@@ -261,6 +296,7 @@ export class MockDocumentRepository implements DocumentRepository {
     );
     if (index === -1) this.collections[collection].push(document);
     else this.collections[collection][index] = document;
+    this.persist();
     return document;
   }
 
@@ -270,6 +306,7 @@ export class MockDocumentRepository implements DocumentRepository {
     );
     if (index === -1) return null;
     const [removed] = this.collections[collection].splice(index, 1);
+    this.persist();
     return removed ?? null;
   }
 
@@ -330,6 +367,14 @@ export class MockDocumentRepository implements DocumentRepository {
       if (match) return match;
     }
     return null;
+  }
+
+  private persist(): void {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(
+      documentStorageKey,
+      JSON.stringify(this.collections),
+    );
   }
 }
 

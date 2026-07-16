@@ -45,6 +45,11 @@ export interface ContractRisk {
   readonly suggestion: string;
   readonly originalText: string;
   readonly state: ContractRiskState;
+  readonly resolution?: {
+    readonly operator: string;
+    readonly handledAt: string;
+    readonly reason?: string;
+  };
 }
 
 export interface ContractReviewTask {

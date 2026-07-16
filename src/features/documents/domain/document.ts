@@ -74,6 +74,12 @@ export type DocumentState =
       readonly reviewTaskId: ReviewTaskId;
     }
   | {
+      readonly kind: "published";
+      readonly publishedAt: IsoDateTime;
+      readonly source: "contract-review";
+      readonly contractTaskId: string;
+    }
+  | {
       readonly kind: "deleted";
       readonly deletedAt: IsoDateTime;
       readonly previousKind?:
@@ -83,6 +89,7 @@ export type DocumentState =
         | "reviewed"
         | "published";
       readonly reviewTaskId?: ReviewTaskId;
+      readonly contractTaskId?: string;
       readonly reason?: "user-action" | "knowledge-deleted";
     };
 
@@ -193,4 +200,16 @@ export function getDocumentReviewTaskId(
     case "classified":
       return undefined;
   }
+}
+
+export function getDocumentContractTaskId(
+  state: DocumentState,
+): string | undefined {
+  if (state.kind === "published" && state.source === "contract-review") {
+    return state.contractTaskId;
+  }
+  if (state.kind === "deleted") {
+    return state.contractTaskId;
+  }
+  return undefined;
 }

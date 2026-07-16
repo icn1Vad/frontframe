@@ -29,7 +29,7 @@ export const mockAuthApi: AuthApi = {
     await waitForMockResponse();
     return {
       status: "demo",
-      message: "当前为演示环境，申请信息尚未提交到服务器。",
+      message: "注册申请暂未开放，请联系管理员创建账号。",
     };
   },
 };

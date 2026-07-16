@@ -82,6 +82,40 @@ export interface DocumentPreview {
   readonly content: string;
 }
 
+export type ReviewRiskLevel = "high" | "medium" | "low";
+export type ReviewRiskState = "open" | "resolved" | "ignored";
+
+export interface ReviewRiskResolution {
+  readonly operator: string;
+  readonly handledAt: string;
+  readonly reason?: string;
+}
+
+export interface ReviewRisk {
+  readonly id: string;
+  readonly category: "semantic" | "conflict" | "consistency";
+  readonly level: ReviewRiskLevel;
+  readonly title: string;
+  readonly summary: string;
+  readonly evidence: string;
+  readonly suggestion: string;
+  readonly state: ReviewRiskState;
+  readonly resolution?: ReviewRiskResolution;
+}
+
+export interface ReviewReport {
+  readonly taskId: ReviewTaskId;
+  readonly documentName: string;
+  readonly summary: string;
+  readonly risks: readonly ReviewRisk[];
+  readonly termination?: {
+    readonly progress: number;
+    readonly discoveredRiskCount: number;
+    readonly operator: string;
+    readonly terminatedAt: string;
+  };
+}
+
 export interface KnowledgeGraph {
   readonly nodes: readonly {
     readonly id: string;
@@ -161,15 +195,27 @@ export interface ReviewTaskPoolApi {
   getReport(
     reviewTaskId: ReviewTaskId,
     options?: RepositoryRequestOptions,
-  ): Promise<DocumentPreview | null>;
+  ): Promise<ReviewReport | null>;
   createTerminationReport(
     reviewTaskId: ReviewTaskId,
     options: MutationOptions,
-  ): Promise<DocumentPreview>;
+  ): Promise<ReviewReport>;
   ignoreAllRisks(
     reviewTaskId: ReviewTaskId,
+    reason: string,
     options: MutationOptions,
-  ): Promise<void>;
+  ): Promise<ReviewReport>;
+  resolveRisk(
+    reviewTaskId: ReviewTaskId,
+    riskId: string,
+    options: MutationOptions,
+  ): Promise<ReviewReport>;
+  ignoreRisk(
+    reviewTaskId: ReviewTaskId,
+    riskId: string,
+    reason: string,
+    options: MutationOptions,
+  ): Promise<ReviewReport>;
   publish(
     documentId: DocumentId,
     options: MutationOptions,

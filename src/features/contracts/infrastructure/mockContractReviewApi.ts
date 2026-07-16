@@ -8,7 +8,7 @@ import type {
 } from "../domain";
 import { isContractEditorSession } from "../domain";
 
-const storageKey = "proofspace.contract-review.tasks.v1";
+const storageKey = "proofspace.contract-review.tasks.v2";
 
 const clauses: readonly ContractClause[] = [
   {
@@ -166,7 +166,7 @@ function createTaskRecord(
 let memoryTasks: ContractReviewTask[] = [
   createTaskRecord({
     id: "contract-demo-001",
-    name: "软件技术服务合同-示例.docx",
+    name: "软件技术服务合同.docx",
     size: 248 * 1024,
     stance: "neutral",
     modules: [
@@ -251,11 +251,29 @@ export const mockContractReviewApi: ContractReviewApi = {
     }));
   },
 
-  async updateRisk(taskId, riskId, state) {
+  async updateRisk(taskId, riskId, command) {
+    const reason = command.reason?.trim();
+    if (command.state === "ignored" && !reason) {
+      throw new Error("忽略风险时必须填写理由");
+    }
     return updateTask(taskId, (task) => ({
       ...task,
       risks: task.risks.map((risk) =>
-        risk.id === riskId ? { ...risk, state } : risk,
+        risk.id === riskId
+          ? {
+              ...risk,
+              state: command.state,
+              ...(command.state === "open"
+                ? { resolution: undefined }
+                : {
+                    resolution: {
+                      operator: "张三",
+                      handledAt: new Date().toISOString(),
+                      ...(reason ? { reason } : {}),
+                    },
+                  }),
+            }
+          : risk,
       ),
     }));
   },

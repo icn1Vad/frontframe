@@ -15,7 +15,10 @@ export interface ContractReviewApi {
   updateRisk(
     taskId: string,
     riskId: string,
-    state: ContractRiskState,
+    command: {
+      readonly state: ContractRiskState;
+      readonly reason?: string;
+    },
   ): Promise<ContractReviewTask>;
   storeTask(taskId: string): Promise<ContractReviewTask>;
 }

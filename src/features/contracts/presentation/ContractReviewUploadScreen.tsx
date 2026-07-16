@@ -107,7 +107,7 @@ export function ContractReviewUploadScreen({
           <div>
             <div className="contract-eyebrow">合同审查</div>
             <h2>上传待审查合同</h2>
-            <p>上传合同并设置审查范围，确认后进入合同审查任务池。</p>
+            <p>用于条款级合同专项审查，可直接上传并配置审查范围，无需先进入文件分类流程。</p>
           </div>
           <button
             type="button"
@@ -155,7 +155,7 @@ export function ContractReviewUploadScreen({
         <div>
           <div className="contract-eyebrow">合同审查配置</div>
           <h2>确认合同审查配置</h2>
-          <p>确认后任务会进入合同审查任务池，原文件分类任务池不受影响。</p>
+          <p>确认后直接创建条款级合同审查任务，不经过文件分类任务池。</p>
         </div>
         <button
           type="button"

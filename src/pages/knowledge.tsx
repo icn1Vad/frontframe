@@ -9,7 +9,9 @@ import {
 } from "../app";
 import {
   KnowledgeDocumentsTable,
+  KnowledgeGraphView,
   KnowledgeToolbar,
+  type KnowledgeGraph,
   type DocumentSummary,
   type KnowledgeView,
   type PageResult,
@@ -39,9 +41,50 @@ const Knowledge: AppPage<KnowledgeProps> = function Knowledge({
   const [query, setQuery] = useState(search);
   const [view, setView] = useState<KnowledgeView>("classic");
   const [rows, setRows] = useState(result.items);
+  const [graph, setGraph] = useState<KnowledgeGraph | null>(null);
+  const [graphLoading, setGraphLoading] = useState(false);
+  const [graphError, setGraphError] = useState<string | null>(null);
 
   useEffect(() => setQuery(search), [search]);
   useEffect(() => setRows(result.items), [result.items]);
+  useEffect(() => {
+    let active = true;
+    void appServices.knowledge.list({
+      page: result.page,
+      pageSize: result.pageSize,
+      search: search || undefined,
+      sort: { by: "updatedAt", direction: "desc" },
+    }).then((clientResult) => {
+      if (active) setRows(clientResult.items);
+    });
+    return () => {
+      active = false;
+    };
+  }, [result.page, result.pageSize, search]);
+
+  useEffect(() => {
+    if (view !== "graph") return;
+    let active = true;
+    setGraphLoading(true);
+    setGraphError(null);
+    void appServices.knowledge.getGraph()
+      .then((nextGraph) => {
+        if (active) setGraph(nextGraph);
+      })
+      .catch((error: unknown) => {
+        if (active) {
+          setGraphError(
+            error instanceof Error ? error.message : "知识关系图加载失败",
+          );
+        }
+      })
+      .finally(() => {
+        if (active) setGraphLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [view, rows]);
 
   const navigate = (page: number, nextSearch = search) => {
     void router.push({
@@ -62,9 +105,11 @@ const Knowledge: AppPage<KnowledgeProps> = function Knowledge({
         viewControl={{ value: view, onChange: setView }}
       />
       {view === "graph" ? (
-        <div className="table-state" role="status">
-          图形视图接口已预留，等待关系图适配器接入。
-        </div>
+        <KnowledgeGraphView
+          graph={graph}
+          loading={graphLoading}
+          error={graphError}
+        />
       ) : (
         <KnowledgeDocumentsTable
           rows={rows}

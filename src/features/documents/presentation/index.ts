@@ -5,5 +5,6 @@ export * from "./documentPresentation";
 export * from "./DocumentTableView";
 export * from "./FileClassificationScreen";
 export * from "./KnowledgeDocumentsTable";
+export * from "./KnowledgeGraphView";
 export * from "./KnowledgeToolbar";
 export * from "./ReviewDocumentsTable";

@@ -125,6 +125,33 @@ export function DocumentTableView({
         loading={loading}
         error={error}
         empty={empty}
+        renderMobileCard={(document) => (
+          <article className="document-mobile-card">
+            <header>
+              <div>{columns[0]?.cell(document)}</div>
+              <div>{columns.find((column) => column.id === "status")?.cell(document)}</div>
+            </header>
+            <dl>
+              {columns
+                .filter((column) => column.id !== "name" && column.id !== "status")
+                .map((column) => (
+                  <div key={column.id}>
+                    <dt>{column.header}</dt>
+                    <dd>{column.cell(document)}</dd>
+                  </div>
+                ))}
+            </dl>
+            <DocumentActionCell
+              document={document}
+              actions={actions}
+              commands={commandHandlers}
+              availableDialogs={{ delete: Boolean(onDelete) }}
+              pendingCommand={pendingCommand}
+              showLabels
+              openDialog={setDialog}
+            />
+          </article>
+        )}
       />
       <div className="action-feedback-slot" role="status" aria-live="polite">
         {feedback ? (

@@ -1,6 +1,10 @@
 import { Eye, FolderArchive, ListChecks, Trash2 } from "lucide-react";
 import { routes } from "../../../app/routes";
-import { getDocumentReviewTaskId, type DocumentSummary } from "../domain";
+import {
+  getDocumentContractTaskId,
+  getDocumentReviewTaskId,
+  type DocumentSummary,
+} from "../domain";
 import type { DocumentActionDefinition } from "./documentActions";
 
 function reviewReportHref(document: DocumentSummary) {
@@ -11,6 +15,16 @@ function reviewReportHref(document: DocumentSummary) {
     );
   }
   return routes.reviewReport(taskId);
+}
+
+function contractReviewReportHref(document: DocumentSummary) {
+  const taskId = getDocumentContractTaskId(document.state);
+  if (!taskId) {
+    throw new Error(
+      `Document ${document.id} is not associated with a contract review task.`,
+    );
+  }
+  return routes.contractReviewTask(taskId);
 }
 
 export const classificationDocumentActions = [
@@ -95,12 +109,22 @@ export const reviewDocumentActions = [
 
 export const knowledgeDocumentActions = [
   {
+    id: "contract-report",
+    type: "link",
+    label: "查看合同报告",
+    icon: ListChecks,
+    href: contractReviewReportHref,
+    isVisible: (document) =>
+      Boolean(getDocumentContractTaskId(document.state)),
+  },
+  {
     id: "report",
     type: "link",
     label: "查看报告",
     icon: ListChecks,
     href: reviewReportHref,
-    isVisible: (document) => Boolean(getDocumentReviewTaskId(document.state)),
+    isVisible: (document) =>
+      Boolean(getDocumentReviewTaskId(document.state)),
   },
   {
     id: "preview",
@@ -108,7 +132,9 @@ export const knowledgeDocumentActions = [
     dialog: "preview",
     label: "预览",
     icon: Eye,
-    isVisible: (document) => !getDocumentReviewTaskId(document.state),
+    isVisible: (document) =>
+      !getDocumentReviewTaskId(document.state) &&
+      !getDocumentContractTaskId(document.state),
   },
   {
     id: "delete",

@@ -20,7 +20,7 @@ describe("mockAuthApi", () => {
     });
   });
 
-  it("makes it explicit that registration is not persisted", async () => {
+  it("reports that self-service registration is unavailable", async () => {
     vi.useFakeTimers();
     const resultPromise = mockAuthApi.register({
       username: "demo-user",
@@ -32,7 +32,7 @@ describe("mockAuthApi", () => {
 
     await expect(resultPromise).resolves.toEqual({
       status: "demo",
-      message: "当前为演示环境，申请信息尚未提交到服务器。",
+      message: "注册申请暂未开放，请联系管理员创建账号。",
     });
   });
 });

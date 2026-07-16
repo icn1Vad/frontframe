@@ -9,6 +9,8 @@ import type {
   DocumentPreview,
   KnowledgeApi,
   MutationOptions,
+  ReviewReport,
+  ReviewRisk,
   ReviewTaskPoolApi,
   TaskPoolQuery,
   VersionedCandidateInput,
@@ -22,6 +24,7 @@ import {
   createReviewProgress,
   createReviewTaskId,
   createUserId,
+  getDocumentContractTaskId,
   getDocumentReviewTaskId,
   type DocumentId,
   type DocumentSummary,
@@ -37,6 +40,115 @@ const operator = {
 const previewContent =
   "第十二条 审批权限：采购金额超过 500 万元时，由采购管理部提交董事会审议；紧急事项应在 3 个工作日内补充备案。";
 
+const reviewReportStorageKey = "proofspace.review-reports.v1";
+
+const reviewRiskSeeds: readonly Omit<
+  ReviewRisk,
+  "id" | "state" | "resolution"
+>[] = [
+  {
+    category: "semantic",
+    level: "high",
+    title: "审批责任边界不清",
+    summary: "采购管理部与董事会的审批职责没有明确区分。",
+    evidence: "采购金额超过 500 万元时，由采购管理部提交董事会审议。",
+    suggestion: "明确采购管理部负责材料审查，董事会负责最终决策。",
+  },
+  {
+    category: "conflict",
+    level: "high",
+    title: "紧急事项期限存在冲突",
+    summary: "紧急事项备案期限与现行制度中的五个工作日要求不一致。",
+    evidence: "紧急事项应在 3 个工作日内补充备案。",
+    suggestion: "核对上位制度并统一补充备案期限。",
+  },
+  {
+    category: "consistency",
+    level: "medium",
+    title: "金额单位表达不统一",
+    summary: "正文使用万元，附件使用元，存在理解偏差风险。",
+    evidence: "采购金额超过 500 万元时。",
+    suggestion: "统一金额单位，并在首次出现时注明币种。",
+  },
+  {
+    category: "semantic",
+    level: "medium",
+    title: "审议结果缺少记录要求",
+    summary: "条款没有规定审议结论、异议和附件的留档方式。",
+    evidence: "由采购管理部提交董事会审议。",
+    suggestion: "补充会议纪要、表决结果和附件归档要求。",
+  },
+  {
+    category: "conflict",
+    level: "medium",
+    title: "适用范围与附件不一致",
+    summary: "正文适用于全部采购事项，附件仅覆盖招标采购。",
+    evidence: "本办法适用于公司采购管理活动。",
+    suggestion: "统一正文与附件的适用范围。",
+  },
+  {
+    category: "consistency",
+    level: "low",
+    title: "术语名称存在差异",
+    summary: "同一审批组织在不同章节使用了两个名称。",
+    evidence: "董事会、公司董事会。",
+    suggestion: "统一组织名称并在术语表中定义。",
+  },
+];
+
+function createReviewReport(
+  reviewTaskId: ReviewTaskId,
+  documentName: string,
+): ReviewReport {
+  return {
+    taskId: reviewTaskId,
+    documentName,
+    summary: "本次审查重点关注审批职责、条款冲突和引用标准一致性。",
+    risks: reviewRiskSeeds.map((risk, index) => ({
+      ...risk,
+      id: `${reviewTaskId}-risk-${index + 1}`,
+      state: "open",
+    })),
+  };
+}
+
+function requireIgnoreReason(reason: string): string {
+  const normalized = reason.trim();
+  if (!normalized) throw new Error("忽略风险时必须填写理由");
+  return normalized;
+}
+
+function handledRisk(
+  risk: ReviewRisk,
+  state: "resolved" | "ignored",
+  reason?: string,
+): ReviewRisk {
+  return {
+    ...risk,
+    state,
+    resolution: {
+      operator: operator.displayName,
+      handledAt: now(),
+      ...(reason ? { reason } : {}),
+    },
+  };
+}
+
+function updateReviewRisk(
+  report: ReviewReport,
+  riskId: string,
+  updater: (risk: ReviewRisk) => ReviewRisk,
+): ReviewReport {
+  const target = report.risks.find((risk) => risk.id === riskId);
+  if (!target) throw new Error("风险项不存在");
+  return {
+    ...report,
+    risks: report.risks.map((risk) =>
+      risk.id === riskId ? updater(risk) : risk,
+    ),
+  };
+}
+
 const initialCandidates: readonly ClassificationCandidateRecord[] = [
   {
     id: createClassificationCandidateId("candidate_purchase_policy"),
@@ -49,7 +161,7 @@ const initialCandidates: readonly ClassificationCandidateRecord[] = [
   },
   {
     id: createClassificationCandidateId("candidate_project_contract"),
-    name: "示例项目合同.pdf",
+    name: "星河项目服务合同.pdf",
     type: "contract",
     level: "department",
     category: "contract",
@@ -366,11 +478,7 @@ export class MockClassificationTaskPoolApi
 }
 
 export class MockReviewTaskPoolApi implements ReviewTaskPoolApi {
-  private readonly reports = new Map<string, DocumentPreview>();
-  private readonly riskResolutions = new Map<
-    string,
-    { readonly operator: string; readonly resolvedAt: string }
-  >();
+  private readonly reports = new Map<string, ReviewReport>();
 
   constructor(private readonly documents: MockDocumentRepository) {}
 
@@ -386,11 +494,13 @@ export class MockReviewTaskPoolApi implements ReviewTaskPoolApi {
 
   async getReport(reviewTaskId: ReviewTaskId, options?: RepositoryRequestOptions) {
     throwIfAborted(options);
-    const cached = this.reports.get(reviewTaskId);
+    const cached = this.readReport(reviewTaskId);
     if (cached) return cached;
     const document = await this.documents.getByReviewTaskId(reviewTaskId, options);
     if (!document || document.state.kind === "reviewing") return null;
-    return { documentName: document.name, content: "审查已完成，报告包含风险概览和检测明细。" };
+    const report = createReviewReport(reviewTaskId, document.name);
+    this.writeReport(report);
+    return report;
   }
 
   async createTerminationReport(reviewTaskId: ReviewTaskId, options: MutationOptions) {
@@ -398,28 +508,80 @@ export class MockReviewTaskPoolApi implements ReviewTaskPoolApi {
     const document = await this.documents.getByReviewTaskId(reviewTaskId, options);
     if (!document) throw new Error("审查任务不存在");
     const progress = document.state.kind === "reviewing" ? document.state.progress : 100;
-    const report = {
+    const report: ReviewReport = {
+      taskId: reviewTaskId,
       documentName: document.name,
-      content: `审查在 ${progress}% 时终止；已发现风险：2 项；操作人：${operator.displayName}；操作时间：${now()}。`,
+      summary: `审查在 ${progress}% 时由人工终止，以下内容为终止前已识别的风险。`,
+      risks: createReviewReport(reviewTaskId, document.name).risks.slice(0, 2),
+      termination: {
+        progress,
+        discoveredRiskCount: 2,
+        operator: operator.displayName,
+        terminatedAt: now(),
+      },
     };
-    this.reports.set(reviewTaskId, report);
+    this.writeReport(report);
     return report;
   }
 
-  async ignoreAllRisks(reviewTaskId: ReviewTaskId, options: MutationOptions) {
+  async ignoreAllRisks(
+    reviewTaskId: ReviewTaskId,
+    reason: string,
+    options: MutationOptions,
+  ) {
     throwIfAborted(options);
-    const document = await this.documents.getByReviewTaskId(reviewTaskId, options);
-    if (!document) throw new Error("审查任务不存在");
-    this.riskResolutions.set(reviewTaskId, {
-      operator: operator.displayName,
-      resolvedAt: now(),
-    });
+    const normalizedReason = requireIgnoreReason(reason);
+    const report = await this.requireReport(reviewTaskId, options);
+    const updated = {
+      ...report,
+      risks: report.risks.map((risk) =>
+        risk.state === "open"
+          ? handledRisk(risk, "ignored", normalizedReason)
+          : risk,
+      ),
+    };
+    this.writeReport(updated);
+    return updated;
+  }
+
+  async resolveRisk(
+    reviewTaskId: ReviewTaskId,
+    riskId: string,
+    options: MutationOptions,
+  ) {
+    throwIfAborted(options);
+    const report = await this.requireReport(reviewTaskId, options);
+    const updated = updateReviewRisk(report, riskId, (risk) =>
+      handledRisk(risk, "resolved"),
+    );
+    this.writeReport(updated);
+    return updated;
+  }
+
+  async ignoreRisk(
+    reviewTaskId: ReviewTaskId,
+    riskId: string,
+    reason: string,
+    options: MutationOptions,
+  ) {
+    throwIfAborted(options);
+    const normalizedReason = requireIgnoreReason(reason);
+    const report = await this.requireReport(reviewTaskId, options);
+    const updated = updateReviewRisk(report, riskId, (risk) =>
+      handledRisk(risk, "ignored", normalizedReason),
+    );
+    this.writeReport(updated);
+    return updated;
   }
 
   async publish(documentId: DocumentId, options: MutationOptions) {
     throwIfAborted(options);
     const current = this.requireDocument(documentId);
     if (current.state.kind !== "reviewed") throw new Error("只有已审查任务可以入库");
+    const report = await this.requireReport(current.state.reviewTaskId, options);
+    if (report.risks.some((risk) => risk.state === "open")) {
+      throw new Error("仍有风险未处理，无法入库");
+    }
     const updated: DocumentSummary = {
       ...current,
       state: {
@@ -459,6 +621,47 @@ export class MockReviewTaskPoolApi implements ReviewTaskPoolApi {
     const document = this.documents.getFromCollection("review", documentId);
     if (!document) throw new Error("审查任务不存在或已被移除");
     return document;
+  }
+
+  private async requireReport(
+    reviewTaskId: ReviewTaskId,
+    options?: RepositoryRequestOptions,
+  ): Promise<ReviewReport> {
+    const report = await this.getReport(reviewTaskId, options);
+    if (!report) throw new Error("审查报告尚未生成");
+    return report;
+  }
+
+  private readReport(reviewTaskId: ReviewTaskId): ReviewReport | undefined {
+    if (typeof window !== "undefined") {
+      const stored = window.localStorage.getItem(reviewReportStorageKey);
+      if (stored) {
+        try {
+          const reports = JSON.parse(stored) as Record<string, ReviewReport>;
+          const report = reports[reviewTaskId];
+          if (report) return report;
+        } catch {
+          window.localStorage.removeItem(reviewReportStorageKey);
+        }
+      }
+    }
+    return this.reports.get(reviewTaskId);
+  }
+
+  private writeReport(report: ReviewReport): void {
+    this.reports.set(report.taskId, report);
+    if (typeof window === "undefined") return;
+    let reports: Record<string, ReviewReport> = {};
+    const stored = window.localStorage.getItem(reviewReportStorageKey);
+    if (stored) {
+      try {
+        reports = JSON.parse(stored) as Record<string, ReviewReport>;
+      } catch {
+        reports = {};
+      }
+    }
+    reports[report.taskId] = report;
+    window.localStorage.setItem(reviewReportStorageKey, JSON.stringify(reports));
   }
 }
 
@@ -500,7 +703,11 @@ export class MockKnowledgeApi implements KnowledgeApi {
         id: document.id,
         label: document.name,
       })),
-      edges: [],
+      edges: knowledge.items.slice(1).map((document, index) => ({
+        source: knowledge.items[index]?.id ?? document.id,
+        target: document.id,
+        relation: "知识关联",
+      })),
     };
   }
 
@@ -510,8 +717,11 @@ export class MockKnowledgeApi implements KnowledgeApi {
     if (!current) throw new Error("知识条目不存在或已被删除");
     this.documents.remove("knowledge", documentId);
     const reviewTaskId = getDocumentReviewTaskId(current.state);
+    const contractTaskId = getDocumentContractTaskId(current.state);
     const sourceCollection = reviewTaskId ? "review" : "classification";
-    const source = this.documents.getFromCollection(sourceCollection, documentId);
+    const source = contractTaskId
+      ? null
+      : this.documents.getFromCollection(sourceCollection, documentId);
     if (source) {
       this.documents.upsert(sourceCollection, {
         ...source,
@@ -520,6 +730,7 @@ export class MockKnowledgeApi implements KnowledgeApi {
           deletedAt: now(),
           previousKind: previousKind(source.state),
           reviewTaskId,
+          contractTaskId,
           reason: "knowledge-deleted",
         },
       });
@@ -531,6 +742,7 @@ export class MockKnowledgeApi implements KnowledgeApi {
         deletedAt: now(),
         previousKind: previousKind(current.state),
         reviewTaskId,
+        contractTaskId,
         reason: "knowledge-deleted",
       },
     };

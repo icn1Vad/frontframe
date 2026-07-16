@@ -26,7 +26,7 @@ import {
   type ContractRiskState,
 } from "../domain";
 import { routes } from "../../../app";
-import { PageStack, Status } from "../../../shared/ui";
+import { Modal, PageStack, Status } from "../../../shared/ui";
 import {
   WpsWebOfficeEditor,
   type WpsWebOfficeEditorHandle,
@@ -103,6 +103,8 @@ export function ContractReviewWorkbenchScreen({
   const [chatPending, setChatPending] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [busyRiskId, setBusyRiskId] = useState<string | null>(null);
+  const [ignoreRiskId, setIgnoreRiskId] = useState<string | null>(null);
+  const [ignoreReason, setIgnoreReason] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
   const clauseRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const wpsEditorRef = useRef<WpsWebOfficeEditorHandle>(null);
@@ -204,7 +206,11 @@ export function ContractReviewWorkbenchScreen({
     });
   };
 
-  const updateRisk = async (risk: ContractRisk, state: ContractRiskState) => {
+  const updateRisk = async (
+    risk: ContractRisk,
+    state: ContractRiskState,
+    reason?: string,
+  ) => {
     if (!task || task.status === "stored") return;
     setBusyRiskId(risk.id);
     setFeedback(null);
@@ -232,7 +238,7 @@ export function ContractReviewWorkbenchScreen({
         });
         await wpsEditorRef.current.save();
       }
-      const updated = await api.updateRisk(task.id, risk.id, state);
+      const updated = await api.updateRisk(task.id, risk.id, { state, reason });
       setTask(updated);
       if (state === "resolved" && !usingWps) setSourceView("revision");
       setFeedback(
@@ -322,9 +328,6 @@ export function ContractReviewWorkbenchScreen({
           <p>{contractReviewStanceLabels[task.stance]} · 已选择 {task.modules.length} 个审查模块</p>
         </div>
         <div className="contract-workbench-actions">
-          <button type="button" className="secondary" onClick={() => { setFeedback("报告导出动作已预留，后续接入后端文件导出接口"); }} disabled={!reportGenerated}>
-            <Save size={14} /> 导出报告
-          </button>
           {reportGenerated ? (
             <button type="button" className="primary" disabled={!canStore} title={canStore ? undefined : "请先处理全部风险项"} onClick={() => void storeTask()}>
               <CheckCircle2 size={15} /> {task.status === "stored" ? "已入库" : "确认并入库"}
@@ -357,15 +360,15 @@ export function ContractReviewWorkbenchScreen({
             <div className="contract-editor-toolbar-controls">
               <div className="contract-editor-provider-toggle">
                 <button type="button" className={editorMode === "mock" ? "selected" : ""} onClick={() => setEditorMode("mock")}>文本预览</button>
-                <button
-                  type="button"
-                  className={editorMode === "wps" ? "selected" : ""}
-                  disabled={editorSession?.provider !== "wps"}
-                  title={editorSession?.provider === "mock" ? editorSession.reason : undefined}
-                  onClick={() => setEditorMode("wps")}
-                >
-                  在线编辑器
-                </button>
+                {editorSession?.provider === "wps" ? (
+                  <button
+                    type="button"
+                    className={editorMode === "wps" ? "selected" : ""}
+                    onClick={() => setEditorMode("wps")}
+                  >
+                    在线编辑器
+                  </button>
+                ) : null}
               </div>
               {editorMode === "mock" ? (
                 <div className="contract-source-view-toggle">
@@ -393,7 +396,7 @@ export function ContractReviewWorkbenchScreen({
           ) : (
             <div className="contract-document-page">
               <div className="contract-document-heading">软件技术服务合同</div>
-              <p className="contract-document-intro">甲方：华东星河科技有限公司　　乙方：示例软件服务有限公司</p>
+              <p className="contract-document-intro">甲方：华东星河科技有限公司　　乙方：远山软件服务有限公司</p>
               {task.clauses.map((clause) => {
                 const risk = task.risks.find((item) => item.clauseId === clause.id);
                 const selected = risk?.id === selectedRiskId;
@@ -441,11 +444,17 @@ export function ContractReviewWorkbenchScreen({
                         <>
                           <div className="contract-risk-evidence"><span>原文依据</span><blockquote>“{risk.originalText}”</blockquote></div>
                           <div className="contract-risk-suggestion"><span>修改建议</span><p>{risk.suggestion}</p></div>
+                          {risk.resolution?.reason ? (
+                            <div className="contract-risk-suggestion">
+                              <span>忽略理由</span>
+                              <p>{risk.resolution.reason}</p>
+                            </div>
+                          ) : null}
                           <div className="contract-risk-actions">
                             <button type="button" className="secondary" onClick={(event) => { event.stopPropagation(); void locateRisk(risk); }}><Highlighter size={13} /> 定位原文</button>
                             {risk.state === "open" ? <>
                               <button type="button" className="primary" disabled={busyRiskId === risk.id} onClick={(event) => { event.stopPropagation(); void updateRisk(risk, "resolved"); }}><Check size={13} /> 应用修改</button>
-                              <button type="button" className="contract-ghost-danger" disabled={busyRiskId === risk.id} onClick={(event) => { event.stopPropagation(); void updateRisk(risk, "ignored"); }}>忽略风险</button>
+                              <button type="button" className="contract-ghost-danger" disabled={busyRiskId === risk.id} onClick={(event) => { event.stopPropagation(); setIgnoreRiskId(risk.id); }}>忽略风险</button>
                             </> : <button type="button" className="contract-ghost-button" disabled={busyRiskId === risk.id} onClick={(event) => { event.stopPropagation(); void updateRisk(risk, "open"); }}>撤销处理</button>}
                           </div>
                         </>
@@ -484,6 +493,52 @@ export function ContractReviewWorkbenchScreen({
         <span>{feedback ?? (task.status === "stored" ? "本合同审查记录已完成入库。" : reportGenerated ? (canStore ? "全部风险已处理，可以入库。" : `还有 ${openRisks.length} 项风险待人工确认。`) : "报告生成后，风险项目和解析结果会在右侧展开。")}</span>
         {reportGenerated && !canStore && task.status !== "stored" ? <span className="contract-footer-hint"><ShieldAlert size={13} /> 应用修改和人工忽略都会写入审计记录</span> : null}
       </div>
+      {ignoreRiskId && task ? (
+        <Modal
+          title="忽略合同风险"
+          subtitle="忽略操作将记录操作者、时间和业务理由。"
+          onClose={() => {
+            setIgnoreRiskId(null);
+            setIgnoreReason("");
+          }}
+        >
+          <label className="report-ignore-reason">
+            <span>忽略理由</span>
+            <textarea
+              rows={4}
+              value={ignoreReason}
+              placeholder="请输入忽略该风险的业务理由"
+              onChange={(event) => setIgnoreReason(event.target.value)}
+            />
+          </label>
+          <div className="modal-actions">
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => {
+                setIgnoreRiskId(null);
+                setIgnoreReason("");
+              }}
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              className="primary danger-action"
+              disabled={!ignoreReason.trim() || busyRiskId === ignoreRiskId}
+              onClick={async () => {
+                const risk = task.risks.find((item) => item.id === ignoreRiskId);
+                if (!risk) return;
+                await updateRisk(risk, "ignored", ignoreReason.trim());
+                setIgnoreRiskId(null);
+                setIgnoreReason("");
+              }}
+            >
+              确认忽略
+            </button>
+          </div>
+        </Modal>
+      ) : null}
     </PageStack>
   );
 }

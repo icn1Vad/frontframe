@@ -43,7 +43,9 @@ export function getDocumentStateLabel(state: DocumentState): string {
     case "reviewed":
       return "已审查";
     case "published":
-      return state.source === "review" ? "已审查入库" : "已分类入库";
+      if (state.source === "review") return "已审查入库";
+      if (state.source === "contract-review") return "合同审查入库";
+      return "已分类入库";
     case "deleted":
       return "已删除";
   }

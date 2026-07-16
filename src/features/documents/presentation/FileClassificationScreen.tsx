@@ -83,7 +83,7 @@ type DialogState =
 
 const initialFiles: readonly UploadFile[] = [
   { id: "upload_purchase_policy", name: "采购管理办法.docx", metadata: "文字文档 · 1.2 兆字节" },
-  { id: "upload_project_contract", name: "示例项目合同.pdf", metadata: "便携文档 · 3.4 兆字节" },
+  { id: "upload_project_contract", name: "星河项目服务合同.pdf", metadata: "便携文档 · 3.4 兆字节" },
   { id: "upload_compliance_report", name: "年度合规报告.pdf", metadata: "便携文档 · 2.8 兆字节" },
   { id: "upload_supplier_note", name: "供应商说明.txt", metadata: "纯文本 · 36 千字节" },
 ];
