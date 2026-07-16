@@ -9,6 +9,7 @@ import {
   type ContractReviewTaskStatus,
 } from "../domain";
 import { routes } from "../../../app";
+import { createIdempotencyKey } from "../../../shared/lib/idempotency";
 import { PageStack, PageToolbar, StatGrid, Status, Surface } from "../../../shared/ui";
 
 export interface ContractReviewTasksScreenProps {
@@ -85,7 +86,10 @@ export function ContractReviewTasksScreen({ api }: ContractReviewTasksScreenProp
     setFeedback(null);
     try {
       if (task.status === "queued") {
-        await api.startReview(task.id);
+        await api.startReview(task.id, {
+          idempotencyKey: createIdempotencyKey("start-contract-review"),
+          expectedVersion: task.version,
+        });
       }
       await router.push(routes.contractReviewTask(task.id));
     } catch (error) {

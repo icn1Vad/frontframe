@@ -4,6 +4,7 @@ import type {
   ChatApi,
   ChatConversation,
 } from "../../app/services";
+import { createIdempotencyKey } from "../../shared/lib/idempotency";
 import { IconButton, Status } from "../../shared/ui";
 
 export interface ChatScreenProps {
@@ -64,13 +65,17 @@ export function ChatScreen({ api }: ChatScreenProps) {
   };
 
   const createConversation = async () => {
-    const conversation = await api.createConversation();
+    const conversation = await api.createConversation(undefined, {
+      idempotencyKey: createIdempotencyKey("create-chat-conversation"),
+    });
     await loadConversations(conversation.id);
     setFeedback("已新建提问集");
   };
 
   const deleteConversation = async (id: string) => {
-    await api.deleteConversation(id);
+    await api.deleteConversation(id, {
+      idempotencyKey: createIdempotencyKey("delete-chat-conversation"),
+    });
     await loadConversations(activeId === id ? undefined : activeId ?? undefined);
     setFeedback("提问集已删除");
   };
@@ -83,7 +88,9 @@ export function ChatScreen({ api }: ChatScreenProps) {
     setSending(true);
     setFeedback(null);
     try {
-      await api.sendMessage(activeId, currentQuestion);
+      await api.sendMessage(activeId, currentQuestion, {
+        idempotencyKey: createIdempotencyKey("send-chat-message"),
+      });
       await loadConversations(activeId);
     } catch (error) {
       setFeedback(error instanceof Error ? error.message : "发送失败，请稍后重试");

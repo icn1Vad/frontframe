@@ -7,6 +7,7 @@ import type {
   ClassificationWorkflowApi,
   DocumentRepository,
   KnowledgeApi,
+  MutationOptions,
   ReviewTaskPoolApi,
 } from "../features/documents/application";
 import {
@@ -58,11 +59,15 @@ export interface ChatConversation {
 export interface ChatApi {
   listConversations(): Promise<readonly ChatConversation[]>;
   getConversation(id: string): Promise<ChatConversation | undefined>;
-  createConversation(title?: string): Promise<ChatConversation>;
-  deleteConversation(id: string): Promise<void>;
+  createConversation(
+    title: string | undefined,
+    options: MutationOptions,
+  ): Promise<ChatConversation>;
+  deleteConversation(id: string, options: MutationOptions): Promise<void>;
   sendMessage(
     conversationId: string,
     question: string,
+    options: MutationOptions,
   ): Promise<ChatMessage>;
 }
 
@@ -86,8 +91,8 @@ const contractReviewAdapter = mockContractReviewApi;
 
 const contractReview: ContractReviewApi = {
   ...contractReviewAdapter,
-  async storeTask(taskId) {
-    const task = await contractReviewAdapter.storeTask(taskId);
+  async storeTask(taskId, options) {
+    const task = await contractReviewAdapter.storeTask(taskId, options);
     mockDocumentRepository.upsert("knowledge", {
       id: createDocumentId(`contract_knowledge_${task.id}`),
       name: task.name,

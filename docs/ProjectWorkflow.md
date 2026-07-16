@@ -89,7 +89,10 @@ interface AppServices {
 }
 ```
 
-当前绑定共享 Mock Store。真实后端接入时，在 `src/app/services.ts` 组合根替换 adapter，并为网络响应增加运行时 schema 校验；页面、表格和表单接口无需改变。
+当前默认绑定共享 Mock Store。真实后端接入时，浏览器端切换为
+`createBrowserHttpAppServices()`，SSR 使用请求级 `createServerHttpAppServices()`；
+具体端点、错误、认证和上传协议见 `docs/BackendApiContract.md` 与
+`openapi/proofspace.yaml`，页面、表格和表单接口无需改变。
 
 ## 路由
 

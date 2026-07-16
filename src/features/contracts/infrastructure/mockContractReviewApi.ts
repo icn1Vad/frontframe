@@ -8,7 +8,7 @@ import type {
 } from "../domain";
 import { isContractEditorSession } from "../domain";
 
-const storageKey = "proofspace.contract-review.tasks.v2";
+const storageKey = "proofspace.contract-review.tasks.v3";
 
 const clauses: readonly ContractClause[] = [
   {
@@ -151,6 +151,7 @@ function createTaskRecord(
 ): ContractReviewTask {
   return {
     id: input.id,
+    version: 1,
     name: input.name,
     size: input.size,
     stance: input.stance,
@@ -184,35 +185,45 @@ let memoryTasks: ContractReviewTask[] = [
 
 function updateTask(
   taskId: string,
+  expectedVersion: number | undefined,
   updater: (task: ContractReviewTask) => ContractReviewTask,
 ): ContractReviewTask {
   const tasks = readTasks();
   const current = tasks.find((task) => task.id === taskId);
   if (!current) throw new Error("合同审查任务不存在");
-  const updated = updater(current);
+  if (expectedVersion !== undefined && current.version !== expectedVersion) {
+    throw new Error("合同审查任务已被其他操作更新，请刷新后重试");
+  }
+  const updated = {
+    ...updater(current),
+    version: current.version + 1,
+  };
   writeTasks(tasks.map((task) => (task.id === taskId ? updated : task)));
   return clone(updated);
 }
 
 export const mockContractReviewApi: ContractReviewApi = {
-  async listTasks() {
+  async listTasks(options) {
+    options?.signal?.throwIfAborted();
     return clone(
       readTasks().sort((left, right) => right.createdAt.localeCompare(left.createdAt)),
     );
   },
 
-  async getTask(taskId) {
+  async getTask(taskId, options) {
+    options?.signal?.throwIfAborted();
     return clone(readTasks().find((task) => task.id === taskId));
   },
 
-  async getEditorSession(taskId) {
+  async getEditorSession(taskId, options) {
+    options?.signal?.throwIfAborted();
     if (typeof window === "undefined") {
       return { provider: "mock", reason: "在线编辑器仅在浏览器中初始化" };
     }
     try {
       const response = await fetch(
         `/api/contract-review/tasks/${encodeURIComponent(taskId)}/editor-session`,
-        { headers: { Accept: "application/json" } },
+        { headers: { Accept: "application/json" }, signal: options?.signal },
       );
       if (!response.ok) {
         return { provider: "mock", reason: `编辑器会话接口返回 ${response.status}` };
@@ -226,7 +237,8 @@ export const mockContractReviewApi: ContractReviewApi = {
     }
   },
 
-  async createTask(input) {
+  async createTask(input, options) {
+    options.signal?.throwIfAborted();
     const task = createTaskRecord({
       ...input,
       id: `contract-${Date.now()}`,
@@ -235,28 +247,31 @@ export const mockContractReviewApi: ContractReviewApi = {
     return clone(task);
   },
 
-  async startReview(taskId) {
-    return updateTask(taskId, (task) => ({
+  async startReview(taskId, options) {
+    options.signal?.throwIfAborted();
+    return updateTask(taskId, options.expectedVersion, (task) => ({
       ...task,
       status: "reviewing",
       progress: Math.max(task.progress, 8),
     }));
   },
 
-  async generateReport(taskId) {
-    return updateTask(taskId, (task) => ({
+  async generateReport(taskId, options) {
+    options.signal?.throwIfAborted();
+    return updateTask(taskId, options.expectedVersion, (task) => ({
       ...task,
       status: "reported",
       progress: 100,
     }));
   },
 
-  async updateRisk(taskId, riskId, command) {
+  async updateRisk(taskId, riskId, command, options) {
+    options.signal?.throwIfAborted();
     const reason = command.reason?.trim();
     if (command.state === "ignored" && !reason) {
       throw new Error("忽略风险时必须填写理由");
     }
-    return updateTask(taskId, (task) => ({
+    return updateTask(taskId, options.expectedVersion, (task) => ({
       ...task,
       risks: task.risks.map((risk) =>
         risk.id === riskId
@@ -278,8 +293,9 @@ export const mockContractReviewApi: ContractReviewApi = {
     }));
   },
 
-  async storeTask(taskId) {
-    return updateTask(taskId, (task) => ({
+  async storeTask(taskId, options) {
+    options.signal?.throwIfAborted();
+    return updateTask(taskId, options.expectedVersion, (task) => ({
       ...task,
       status: "stored",
     }));

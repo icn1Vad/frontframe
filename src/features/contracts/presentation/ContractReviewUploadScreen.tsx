@@ -9,6 +9,7 @@ import {
   type ContractReviewStance,
 } from "../domain";
 import { routes } from "../../../app";
+import { createIdempotencyKey } from "../../../shared/lib/idempotency";
 import { PageStack, PageToolbar, Status, Surface } from "../../../shared/ui";
 
 export interface ContractReviewUploadScreenProps {
@@ -18,6 +19,7 @@ export interface ContractReviewUploadScreenProps {
 interface PendingContract {
   readonly name: string;
   readonly size: number;
+  readonly file: File;
 }
 
 function formatFileSize(size: number): string {
@@ -55,7 +57,7 @@ export function ContractReviewUploadScreen({
       setFeedback("合同审查目前只接受文字文档或便携文档");
       return;
     }
-    setPendingFile({ name: file.name, size: file.size });
+    setPendingFile({ name: file.name, size: file.size, file });
     setName(file.name);
     setFeedback(null);
   };
@@ -85,10 +87,13 @@ export function ContractReviewUploadScreen({
     setFeedback(null);
     try {
       await api.createTask({
+        file: pendingFile.file,
         name: name.trim(),
         size: pendingFile.size,
         stance,
         modules,
+      }, {
+        idempotencyKey: createIdempotencyKey("create-contract-review"),
       });
       await router.push(routes.contractReviewTasks);
     } catch (error) {

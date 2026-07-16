@@ -6,6 +6,20 @@ export interface LoginPayload {
   readonly password: string;
 }
 
+export interface AuthUser {
+  readonly id: string;
+  readonly username: string;
+  readonly displayName: string;
+  readonly roleLabel: string;
+  readonly permissions: readonly string[];
+}
+
+export interface AuthSession {
+  readonly user: AuthUser;
+  readonly expiresAt: string;
+  readonly csrfToken: string;
+}
+
 export interface RegisterPayload {
   readonly username: string;
   readonly password: string;
@@ -15,16 +29,19 @@ export interface RegisterPayload {
 export interface LoginResult {
   readonly status: "authenticated";
   readonly message: string;
+  readonly session: AuthSession;
 }
 
 export interface RegisterResult {
-  readonly status: "demo" | "submitted";
+  readonly status: "submitted" | "unavailable";
   readonly message: string;
 }
 
 export interface AuthApi {
   login(payload: LoginPayload): Promise<LoginResult>;
   register(payload: RegisterPayload): Promise<RegisterResult>;
+  getSession(): Promise<AuthSession | null>;
+  logout(): Promise<void>;
 }
 
 export class AuthApiError extends Error {

@@ -140,10 +140,6 @@ export interface ClassificationWorkflowApi {
     files: readonly File[],
     options: MutationOptions,
   ): Promise<readonly ClassificationCandidateRecord[]>;
-  confirmUpload(
-    candidateIds: readonly ClassificationCandidateId[],
-    options: MutationOptions,
-  ): Promise<readonly ClassificationCandidateRecord[]>;
   getPreview(
     candidateId: ClassificationCandidateId,
     options?: RepositoryRequestOptions,

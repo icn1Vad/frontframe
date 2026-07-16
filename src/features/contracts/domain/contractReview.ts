@@ -54,6 +54,7 @@ export interface ContractRisk {
 
 export interface ContractReviewTask {
   readonly id: string;
+  readonly version: number;
   readonly name: string;
   readonly size: number;
   readonly stance: ContractReviewStance;

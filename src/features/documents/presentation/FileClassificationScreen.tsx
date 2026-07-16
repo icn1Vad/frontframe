@@ -477,13 +477,9 @@ export function FileClassificationScreen({ api }: FileClassificationScreenProps)
     try {
       const browserFiles = files.flatMap((item) => (item.file ? [item.file] : []));
       if (browserFiles.length) {
-        const uploaded = await api.uploadFiles(browserFiles, {
+        await api.uploadFiles(browserFiles, {
           idempotencyKey: idempotencyKey("upload-files"),
         });
-        await api.confirmUpload(
-          uploaded.map((candidate) => candidate.id),
-          { idempotencyKey: idempotencyKey("confirm-upload") },
-        );
       }
       setFiles([]);
       setStage("confirm");

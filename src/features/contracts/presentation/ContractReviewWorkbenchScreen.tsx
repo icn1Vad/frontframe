@@ -26,6 +26,7 @@ import {
   type ContractRiskState,
 } from "../domain";
 import { routes } from "../../../app";
+import { createIdempotencyKey } from "../../../shared/lib/idempotency";
 import { Modal, PageStack, Status } from "../../../shared/ui";
 import {
   WpsWebOfficeEditor,
@@ -149,7 +150,10 @@ export function ContractReviewWorkbenchScreen({
 
   useEffect(() => {
     if (!task || task.status !== "queued") return;
-    void api.startReview(task.id).then((updated) => {
+    void api.startReview(task.id, {
+      idempotencyKey: createIdempotencyKey("start-contract-review"),
+      expectedVersion: task.version,
+    }).then((updated) => {
       setTask(updated);
       setProgress(updated.progress);
     });
@@ -238,7 +242,15 @@ export function ContractReviewWorkbenchScreen({
         });
         await wpsEditorRef.current.save();
       }
-      const updated = await api.updateRisk(task.id, risk.id, { state, reason });
+      const updated = await api.updateRisk(
+        task.id,
+        risk.id,
+        { state, reason },
+        {
+          idempotencyKey: createIdempotencyKey("update-contract-risk"),
+          expectedVersion: task.version,
+        },
+      );
       setTask(updated);
       if (state === "resolved" && !usingWps) setSourceView("revision");
       setFeedback(
@@ -259,7 +271,10 @@ export function ContractReviewWorkbenchScreen({
     if (!task || !reviewComplete || reportGenerated) return;
     setFeedback(null);
     try {
-      const updated = await api.generateReport(task.id);
+      const updated = await api.generateReport(task.id, {
+        idempotencyKey: createIdempotencyKey("generate-contract-report"),
+        expectedVersion: task.version,
+      });
       setTask(updated);
       setReportGenerated(true);
       setProgress(100);
@@ -272,7 +287,10 @@ export function ContractReviewWorkbenchScreen({
   const storeTask = async () => {
     if (!task || !canStore) return;
     try {
-      const updated = await api.storeTask(task.id);
+      const updated = await api.storeTask(task.id, {
+        idempotencyKey: createIdempotencyKey("store-contract-review"),
+        expectedVersion: task.version,
+      });
       setTask(updated);
       setFeedback("合同审查记录已入库");
     } catch (error) {

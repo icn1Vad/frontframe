@@ -305,14 +305,6 @@ export class MockClassificationWorkflowApi
     return uploaded;
   }
 
-  async confirmUpload(
-    candidateIds: readonly ClassificationCandidateRecord["id"][],
-    options: MutationOptions,
-  ): Promise<readonly ClassificationCandidateRecord[]> {
-    throwIfAborted(options);
-    return this.candidates.filter((candidate) => candidateIds.includes(candidate.id));
-  }
-
   async getPreview(
     candidateId: ClassificationCandidateRecord["id"],
     options?: RepositoryRequestOptions,

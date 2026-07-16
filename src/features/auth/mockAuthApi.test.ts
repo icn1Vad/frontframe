@@ -2,8 +2,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { mockAuthApi } from "./mockAuthApi";
 
 describe("mockAuthApi", () => {
-  afterEach(() => {
+  afterEach(async () => {
     vi.useRealTimers();
+    await mockAuthApi.logout();
   });
 
   it("returns an authenticated result for the demo login flow", async () => {
@@ -17,7 +18,14 @@ describe("mockAuthApi", () => {
 
     await expect(resultPromise).resolves.toMatchObject({
       status: "authenticated",
+      session: {
+        user: {
+          username: "demo-user",
+          permissions: expect.arrayContaining(["dashboard:read"]),
+        },
+      },
     });
+    await expect(mockAuthApi.getSession()).resolves.not.toBeNull();
   });
 
   it("reports that self-service registration is unavailable", async () => {
@@ -31,7 +39,7 @@ describe("mockAuthApi", () => {
     await vi.runAllTimersAsync();
 
     await expect(resultPromise).resolves.toEqual({
-      status: "demo",
+      status: "unavailable",
       message: "注册申请暂未开放，请联系管理员创建账号。",
     });
   });
