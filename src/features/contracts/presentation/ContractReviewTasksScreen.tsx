@@ -103,7 +103,7 @@ export function ContractReviewTasksScreen({ api }: ContractReviewTasksScreenProp
     <PageStack>
       <PageToolbar className="contract-page-toolbar">
         <div>
-          <div className="contract-eyebrow">合同审查任务池</div>
+          <div className="contract-eyebrow">合同专项审查</div>
           <h2>合同审查任务池</h2>
           <p>集中查看合同审查进度、风险报告和入库状态。</p>
         </div>

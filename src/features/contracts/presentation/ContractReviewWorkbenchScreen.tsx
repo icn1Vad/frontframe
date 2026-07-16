@@ -341,7 +341,7 @@ export function ContractReviewWorkbenchScreen({
       <header className="contract-workbench-header">
         <div className="contract-workbench-title">
           <Link href={routes.contractReviewTasks} className="contract-back-link"><ArrowLeft size={14} /> 返回任务池</Link>
-          <div className="contract-eyebrow">合同审查工作台</div>
+          <div className="contract-eyebrow">合同专项审查工作台</div>
           <div className="contract-title-line"><FileText size={21} /><h2>{task.name}</h2><Status tone={status.tone}>{status.label}</Status></div>
           <p>{contractReviewStanceLabels[task.stance]} · 已选择 {task.modules.length} 个审查模块</p>
         </div>

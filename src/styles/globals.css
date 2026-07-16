@@ -113,6 +113,36 @@ h1, h2, h3, p { margin: 0; }
 .metric-card span { color: var(--muted); font-size: 13px; }
 .metric-card strong { margin-top: 4px; font-size: 28px; font-weight: 900; }
 .metric-card a { margin-top: 3px; color: var(--primary); font-size: 12px; }
+.dashboard-page { gap: 30px; }
+.dashboard-section { width: 100%; min-width: 0; }
+.dashboard-section-heading { min-height: 48px; margin-bottom: 12px; align-items: flex-end; }
+.dashboard-section-heading h2 { font-size: 18px; }
+.dashboard-section-heading p { margin-top: 5px; color: var(--muted); font-size: 12px; }
+.dashboard-total { color: var(--muted); font-size: 12px; }
+.dashboard-todo-list { overflow: hidden; }
+.dashboard-todo-row { min-height: 76px; padding: 12px 18px; display: grid; grid-template-columns: 40px minmax(260px, 1fr) 74px 128px; align-items: center; gap: 16px; border-bottom: 1px solid var(--divider); }
+.dashboard-todo-row:last-child { border-bottom: 0; }
+.dashboard-todo-icon, .dashboard-contract-icon { width: 36px; height: 36px; display: grid; place-items: center; color: var(--primary); background: #fbf4eb; border-radius: 10px; }
+.dashboard-todo-icon svg, .dashboard-contract-icon svg { width: 17px; height: 17px; }
+.dashboard-todo-copy { min-width: 0; }
+.dashboard-todo-copy strong { font-size: 14px; }
+.dashboard-todo-copy p { margin-top: 5px; color: var(--muted); font-size: 11px; font-weight: 600; }
+.dashboard-todo-count { font-size: 18px; text-align: right; white-space: nowrap; }
+.dashboard-todo-action { width: 128px; gap: 6px; }
+.dashboard-quick-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.dashboard-quick-card { position: relative; min-height: 140px; padding: 20px; display: flex; flex-direction: column; background: #fff; border: 1px solid var(--border); border-radius: var(--surface-radius); box-shadow: var(--shadow); }
+.dashboard-quick-card > span { width: 38px; height: 38px; display: grid; place-items: center; color: var(--primary); background: #fbf4eb; border-radius: 10px; }
+.dashboard-quick-card > span svg { width: 18px; height: 18px; }
+.dashboard-quick-card strong { margin-top: 15px; font-size: 14px; }
+.dashboard-quick-card p { max-width: 220px; margin-top: 6px; color: var(--muted); font-size: 11px; font-weight: 600; line-height: 1.55; }
+.dashboard-quick-arrow { position: absolute; right: 18px; bottom: 18px; color: var(--primary); }
+.dashboard-contract-entry { min-height: 76px; margin-top: 16px; padding: 14px 18px; display: grid; grid-template-columns: 40px minmax(0, 1fr) auto auto; align-items: center; gap: 16px; }
+.dashboard-contract-entry > div { min-width: 0; }
+.dashboard-contract-entry strong { font-size: 14px; }
+.dashboard-contract-entry p { margin-top: 5px; color: var(--muted); font-size: 11px; font-weight: 600; }
+.dashboard-contract-entry > .secondary { gap: 6px; }
+.dashboard-contract-tasks, .dashboard-heading-link { display: inline-flex; align-items: center; gap: 6px; color: var(--primary); font-size: 12px; white-space: nowrap; }
+.dashboard-heading-link { min-height: 32px; }
 .flow-panel { width: 100%; min-width: 0; min-height: 390px; overflow-x: auto; background: #fff; border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); overscroll-behavior-inline: contain; }
 .flow-panel h2 { width: 100%; min-width: 1080px; height: 58px; padding: 18px 21px; font-size: 18px; }
 .flow-row { width: 100%; min-width: 1080px; display: grid; grid-template-columns: minmax(170px, 210px) repeat(3, minmax(250px, 1fr)); min-height: 88px; padding: 0 21px; align-items: center; border-bottom: 1px solid var(--divider); }
@@ -192,6 +222,18 @@ h1, h2, h3, p { margin: 0; }
 .icon-button svg { width: 16px; height: 16px; }
 .icon-button-label { display: none; }
 .icon-button.danger { color: var(--danger); background: #f8edea; }
+.row-primary-action.icon-button { width: auto; min-width: 90px; height: 34px; padding: 0 10px; display: inline-flex; flex: 0 0 auto; gap: 6px; }
+.row-primary-action .icon-button-label { display: inline; white-space: nowrap; }
+.row-primary-action.primary { color: #fff; background: var(--primary); }
+.row-primary-action.secondary { color: var(--text); background: var(--button); }
+.row-more-trigger[aria-expanded="true"] { color: var(--text); background: #e8e3dc; }
+.row-action-menu { position: fixed; z-index: 1200; width: 196px; padding: 6px; background: #fff; border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 16px 40px rgba(38,31,20,.16); animation: motion-account-menu-in var(--motion-duration-fast) var(--motion-ease-emphasis) both; }
+.row-action-menu-item { width: 100%; min-height: 40px; padding: 0 10px; display: flex; align-items: center; gap: 9px; color: var(--text); background: transparent; border-radius: 7px; font-size: 12px; font-weight: 700; text-align: left; }
+.row-action-menu-item svg { width: 15px; height: 15px; color: var(--muted); }
+.row-action-menu-item:hover, .row-action-menu-item:focus-visible { background: var(--muted-surface); }
+.row-action-menu-item.danger { color: var(--danger); }
+.row-action-menu-item.danger svg { color: var(--danger); }
+.row-action-menu-item:disabled { opacity: .48; cursor: not-allowed; }
 .blank-row { display: none; }
 .table-empty, .table-state, .data-grid-state { min-height: 220px; padding: 32px; display: grid; grid-column: 1 / -1; place-items: center; color: var(--muted); text-align: center; }
 .data-grid[data-state="loading"] .data-grid-state { min-height: 280px; }
@@ -676,6 +718,18 @@ button:disabled { cursor: not-allowed; }
   animation: motion-feedback-in var(--motion-duration-base) var(--motion-ease-emphasis) both;
 }
 .action-feedback.error { color: var(--danger); background: #f6e8e5; }
+.classification-pool-feedback {
+  min-height: 40px;
+  padding: 0 14px;
+  gap: 8px;
+  color: #315f40;
+  background: #e8f7ec;
+  border: 1px solid #cbe6d2;
+  border-radius: 10px;
+  box-shadow: 0 8px 20px rgba(49, 95, 64, .08);
+  font-weight: 700;
+}
+.classification-pool-feedback svg { width: 17px; height: 17px; flex: 0 0 auto; }
 
 .upload-panel, .pending-panel, .confirm-table {
   animation: motion-surface-in var(--motion-duration-panel) var(--motion-ease-emphasis) both;

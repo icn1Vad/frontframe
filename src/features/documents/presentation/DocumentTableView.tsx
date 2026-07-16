@@ -100,7 +100,7 @@ export function DocumentTableView({
     {
       id: "actions",
       header: "操作",
-      width: 190,
+      width: 250,
       cell: (document) => (
         <DocumentActionCell
           document={document}
@@ -147,7 +147,6 @@ export function DocumentTableView({
               commands={commandHandlers}
               availableDialogs={{ delete: Boolean(onDelete) }}
               pendingCommand={pendingCommand}
-              showLabels
               openDialog={setDialog}
             />
           </article>

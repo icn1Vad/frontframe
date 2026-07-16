@@ -1,5 +1,6 @@
 import {
   Check,
+  CheckCircle2,
   Eye,
   FileText,
   Plus,
@@ -528,8 +529,15 @@ export function FileClassificationScreen({ api }: FileClassificationScreenProps)
   const feedbackNode = (
     <div className="action-feedback-slot" role="status" aria-live="polite">
       {feedback ? (
-        <span className={`action-feedback${feedback.includes("失败") ? " error" : ""}`}>
-          {feedback}
+        <span
+          className={`action-feedback${feedback.includes("失败") ? " error" : ""}${
+            feedback.includes("分类任务池") ? " classification-pool-feedback" : ""
+          }`}
+        >
+          {feedback.includes("分类任务池") ? (
+            <CheckCircle2 aria-hidden="true" />
+          ) : null}
+          <span>{feedback}</span>
         </span>
       ) : null}
     </div>

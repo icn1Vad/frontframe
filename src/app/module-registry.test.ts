@@ -135,6 +135,18 @@ describe("core module registry", () => {
     expect(moduleRegistry.get("reviewTasks").navigation?.label).toBe(
       "审查任务池",
     );
+    expect(
+      moduleRegistry.getNavigation().find((section) => section.id === "governance")
+        ?.label,
+    ).toBe("文件治理");
+    expect(
+      moduleRegistry.getNavigation().find((section) => section.id === "contract-review")
+        ?.label,
+    ).toBe("合同专项审查");
+    expect(
+      moduleRegistry.getNavigation().find((section) => section.id === "knowledge")
+        ?.label,
+    ).toBeUndefined();
     expect(moduleRegistry.find("not-registered")).toBeUndefined();
   });
 });

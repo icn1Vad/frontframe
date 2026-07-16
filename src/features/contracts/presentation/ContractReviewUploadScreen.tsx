@@ -110,7 +110,7 @@ export function ContractReviewUploadScreen({
       <PageStack>
         <PageToolbar className="contract-page-toolbar">
           <div>
-            <div className="contract-eyebrow">合同审查</div>
+            <div className="contract-eyebrow">合同专项审查</div>
             <h2>上传待审查合同</h2>
             <p>用于条款级合同专项审查，可直接上传并配置审查范围，无需先进入文件分类流程。</p>
           </div>
@@ -158,7 +158,7 @@ export function ContractReviewUploadScreen({
     <PageStack>
       <PageToolbar className="contract-page-toolbar">
         <div>
-          <div className="contract-eyebrow">合同审查配置</div>
+          <div className="contract-eyebrow">合同专项审查配置</div>
           <h2>确认合同审查配置</h2>
           <p>确认后直接创建条款级合同审查任务，不经过文件分类任务池。</p>
         </div>

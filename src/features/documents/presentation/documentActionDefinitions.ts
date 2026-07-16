@@ -34,13 +34,19 @@ export const classificationDocumentActions = [
     dialog: "preview",
     label: "预览",
     icon: Eye,
+    isPrimary: (document) =>
+      document.state.kind !== "pending" &&
+      document.state.kind !== "classified",
+    variant: "secondary",
   },
   {
     id: "publish",
     type: "command",
     command: "publish",
-    label: "入库",
+    label: "直接入库",
     icon: FolderArchive,
+    isPrimary: () => true,
+    variant: "secondary",
     isVisible: (document) =>
       document.state.kind === "pending" || document.state.kind === "classified",
   },
@@ -48,8 +54,10 @@ export const classificationDocumentActions = [
     id: "start-review",
     type: "command",
     command: "startReview",
-    label: "审查",
+    label: "发起审查",
     icon: ListChecks,
+    isPrimary: () => true,
+    variant: "primary",
     isVisible: (document) =>
       document.state.kind === "pending" || document.state.kind === "classified",
   },
@@ -72,6 +80,8 @@ export const reviewDocumentActions = [
     dialog: "progress",
     label: "查看进度",
     icon: ListChecks,
+    isPrimary: () => true,
+    variant: "secondary",
     isVisible: (document) => document.state.kind === "reviewing",
   },
   {
@@ -79,6 +89,8 @@ export const reviewDocumentActions = [
     type: "link",
     label: "查看报告",
     icon: ListChecks,
+    isPrimary: () => true,
+    variant: "secondary",
     href: reviewReportHref,
     isVisible: (document) =>
       document.state.kind === "reviewed" ||
@@ -113,6 +125,8 @@ export const knowledgeDocumentActions = [
     type: "link",
     label: "查看合同报告",
     icon: ListChecks,
+    isPrimary: () => true,
+    variant: "secondary",
     href: contractReviewReportHref,
     isVisible: (document) =>
       Boolean(getDocumentContractTaskId(document.state)),
@@ -122,6 +136,8 @@ export const knowledgeDocumentActions = [
     type: "link",
     label: "查看报告",
     icon: ListChecks,
+    isPrimary: () => true,
+    variant: "secondary",
     href: reviewReportHref,
     isVisible: (document) =>
       Boolean(getDocumentReviewTaskId(document.state)),
@@ -132,6 +148,8 @@ export const knowledgeDocumentActions = [
     dialog: "preview",
     label: "预览",
     icon: Eye,
+    isPrimary: () => true,
+    variant: "secondary",
     isVisible: (document) =>
       !getDocumentReviewTaskId(document.state) &&
       !getDocumentContractTaskId(document.state),

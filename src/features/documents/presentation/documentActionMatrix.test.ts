@@ -40,6 +40,16 @@ function visibleActionIds(
     .map((action) => action.id);
 }
 
+function primaryActionIds(
+  actions: readonly DocumentActionDefinition[],
+  document: DocumentSummary,
+) {
+  return actions
+    .filter((action) => !action.isVisible || action.isVisible(document))
+    .filter((action) => action.isPrimary?.(document))
+    .map((action) => action.id);
+}
+
 describe("document action matrix", () => {
   it("matches all classification task pool states", () => {
     expect(
@@ -68,6 +78,23 @@ describe("document action matrix", () => {
     ).toEqual(["preview"]);
   });
 
+  it("keeps classification branch actions visible and moves supporting actions to more", () => {
+    const pending = documentWith({ kind: "pending", queuedAt: timestamp });
+    const published = documentWith({
+      kind: "published",
+      source: "classification",
+      publishedAt: timestamp,
+    });
+
+    expect(primaryActionIds(classificationDocumentActions, pending)).toEqual([
+      "publish",
+      "start-review",
+    ]);
+    expect(primaryActionIds(classificationDocumentActions, published)).toEqual([
+      "preview",
+    ]);
+  });
+
   it("matches all review task pool states in view-change-delete order", () => {
     expect(
       visibleActionIds(
@@ -91,6 +118,26 @@ describe("document action matrix", () => {
       visibleActionIds(
         reviewDocumentActions,
         documentWith({ kind: "deleted", deletedAt: timestamp, previousKind: "reviewed", reviewTaskId }),
+      ),
+    ).toEqual(["report"]);
+  });
+
+  it("uses progress and report as the primary review actions", () => {
+    expect(
+      primaryActionIds(
+        reviewDocumentActions,
+        documentWith({
+          kind: "reviewing",
+          reviewTaskId,
+          startedAt: timestamp,
+          progress: createReviewProgress(20),
+        }),
+      ),
+    ).toEqual(["progress"]);
+    expect(
+      primaryActionIds(
+        reviewDocumentActions,
+        documentWith({ kind: "reviewed", reviewTaskId, reviewedAt: timestamp }),
       ),
     ).toEqual(["report"]);
   });
