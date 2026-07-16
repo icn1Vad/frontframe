@@ -36,7 +36,7 @@ const itemVariants = {
 
 const productFlow = ["文件分类", "智能审校", "知识入库", "溯源问答"];
 const productValues = [
-  "AI 与人工协同确认",
+  "智能分析与人工协同确认",
   "风险结论可追溯",
   "知识资产持续沉淀",
 ];
@@ -63,10 +63,10 @@ export function HeroSection() {
             variants={itemVariants}
           >
             <span className="font-display text-2xl leading-none text-ink">
-              ProofSpace
+              明证智能
             </span>
             <span className="h-1 w-1 rounded-full bg-copper" />
-            <span>明证智能</span>
+            <span>企业文件治理</span>
           </motion.div>
           <motion.h1
             className="text-balance text-4xl font-semibold leading-[1.08] tracking-normal text-ink md:text-6xl"
@@ -121,7 +121,7 @@ export function HeroSection() {
           <div className="absolute inset-x-4 top-8 h-px bg-line/70" />
           <div className="absolute inset-x-4 bottom-14 h-px bg-line/70" />
           <div className="absolute right-6 top-12 hidden text-xs uppercase tracking-[0.18em] text-muted/70 md:block">
-            Governance Network
+            企业治理网络
           </div>
           {shouldReduceMotion ? (
             fallback

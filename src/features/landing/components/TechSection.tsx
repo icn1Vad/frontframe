@@ -8,7 +8,7 @@ const AgentOrbit = dynamic(() => import("./AgentOrbit"), {
   ssr: false,
   loading: () => (
     <div className="flex h-[360px] items-center justify-center text-sm text-muted md:h-[560px]">
-      正在生成 Agent 网络
+      正在生成智能体网络
     </div>
   ),
 });
@@ -17,28 +17,28 @@ const smoothEase: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
 const architectureLayers = [
   {
-    code: "L1 / Single Agent Runtime",
-    title: "单 Agent 执行内核",
+    code: "第一层｜单智能体运行内核",
+    title: "单智能体执行内核",
     description:
-      "由 Aituge Single-Agent Runtime 驱动，统一完成 ReAct 推理、工具并行调用、流式响应、会话持久化与上下文压缩。",
+      "由单智能体运行内核驱动，统一完成推理与行动循环、工具并行调用、流式响应、会话持久化与上下文压缩。",
   },
   {
-    code: "L2 / Agent Harness",
-    title: "Harness 控制层",
+    code: "第二层｜智能体控制框架",
+    title: "任务控制层",
     description:
-      "由 TaskManager、Scheduler、Registry、Session、Trace 与 SSE 组成，负责任务生命周期、调度和并发控制。",
+      "由任务管理、调度中心、注册中心、会话管理、追踪系统与服务端事件流组成，负责任务生命周期、调度和并发控制。",
   },
   {
-    code: "L3 / Data Governance",
+    code: "第三层｜数据治理",
     title: "数据治理层",
     description:
-      "Agent 不直接访问数据库。SQL、RAG、知识库、文件和外部 API 均通过 Data Access Gateway 统一鉴权与审计。",
+      "智能体不直接访问数据库。结构化查询、检索增强生成、知识库、文件和外部接口均通过数据访问网关统一鉴权与审计。",
   },
   {
-    code: "Context / Memory",
+    code: "上下文｜记忆",
     title: "双层会话与上下文工程",
     description:
-      "SQLite 保存完整历史，Redis 保存运行态上下文；超出预算时优先压缩，失败后裁剪兜底。",
+      "本地关系数据库保存完整历史，高速缓存保存运行态上下文；超出预算时优先压缩，失败后裁剪兜底。",
   },
 ];
 
@@ -69,7 +69,7 @@ export function TechSection() {
         <div className="relative z-10">
           <SectionTitle
             className="[&_h2]:text-3xl md:[&_h2]:text-4xl"
-            eyebrow="Architecture"
+            eyebrow="技术架构"
             title={
               <>
                 三层技术架构，
@@ -77,7 +77,7 @@ export function TechSection() {
                 隔离执行、调度与数据访问
               </>
             }
-            subtitle="执行内核只负责完成一次 Agent ReAct 任务；Harness 负责生命周期和资源调度；数据治理层负责所有真实数据访问。职责分离后，每个任务都可追踪、可审计、可扩展。"
+            subtitle="执行内核只负责完成一次智能体推理与行动任务；控制层负责生命周期和资源调度；数据治理层负责所有真实数据访问。职责分离后，每个任务都可追踪、可审计、可扩展。"
           />
 
           <div className="mt-12 grid gap-4 md:grid-cols-2">
@@ -116,7 +116,7 @@ export function TechSection() {
           <div className="absolute inset-x-10 top-10 h-px bg-line/70" />
           <div className="absolute inset-x-10 bottom-10 h-px bg-line/70" />
           <div className="absolute left-10 top-14 text-xs uppercase tracking-[0.18em] text-muted/70">
-            Harness Control Plane
+            任务控制平面
           </div>
           {shouldReduceMotion ? (
             fallback

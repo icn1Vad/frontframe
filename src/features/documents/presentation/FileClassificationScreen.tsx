@@ -82,10 +82,10 @@ type DialogState =
   | null;
 
 const initialFiles: readonly UploadFile[] = [
-  { id: "upload_purchase_policy", name: "采购管理办法.docx", metadata: "DOCX · 1.2 MB" },
-  { id: "upload_project_contract", name: "XX项目合同.pdf", metadata: "PDF · 3.4 MB" },
-  { id: "upload_compliance_report", name: "年度合规报告.pdf", metadata: "PDF · 2.8 MB" },
-  { id: "upload_supplier_note", name: "供应商说明.txt", metadata: "TXT · 36 KB" },
+  { id: "upload_purchase_policy", name: "采购管理办法.docx", metadata: "文字文档 · 1.2 兆字节" },
+  { id: "upload_project_contract", name: "示例项目合同.pdf", metadata: "便携文档 · 3.4 兆字节" },
+  { id: "upload_compliance_report", name: "年度合规报告.pdf", metadata: "便携文档 · 2.8 兆字节" },
+  { id: "upload_supplier_note", name: "供应商说明.txt", metadata: "纯文本 · 36 千字节" },
 ];
 
 const emptyStats: ClassificationCandidateStats = {
@@ -149,10 +149,16 @@ function idempotencyKey(prefix: string): string {
 
 function formatFileSize(file: File): string {
   const size = file.size >= 1024 * 1024
-    ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
-    : `${Math.max(1, Math.round(file.size / 1024))} KB`;
-  const extension = file.name.split(".").pop()?.toUpperCase() || "FILE";
-  return `${extension} · ${size}`;
+    ? `${(file.size / (1024 * 1024)).toFixed(1)} 兆字节`
+    : `${Math.max(1, Math.round(file.size / 1024))} 千字节`;
+  const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
+  const fileType = {
+    pdf: "便携文档",
+    docx: "文字文档",
+    xlsx: "表格文档",
+    txt: "纯文本",
+  }[extension] ?? "文件";
+  return `${fileType} · ${size}`;
 }
 
 export function FileClassificationScreen({ api }: FileClassificationScreenProps) {
@@ -483,7 +489,7 @@ export function FileClassificationScreen({ api }: FileClassificationScreenProps)
       setStage("confirm");
       setPage(1);
       await loadCandidates();
-      setFeedback("文件已提交，正在进行 AI 分类");
+      setFeedback("文件已提交，正在进行智能分类");
     } catch (error) {
       setFeedback(error instanceof Error ? `上传失败：${error.message}` : "上传失败，请稍后重试");
     } finally {
@@ -562,7 +568,7 @@ export function FileClassificationScreen({ api }: FileClassificationScreenProps)
           >
             <span className="plus-circle"><Plus /></span>
             <strong>拖拽文件到这里，或点击查看待上传文件</strong>
-            <small>支持 PDF / DOCX / XLSX / TXT，最大 50 MB</small>
+            <small>支持便携文档、文字文档、表格文档和纯文本，最大 50 兆字节</small>
             <span className="secondary">进入上传区</span>
           </button>
         </Surface>
@@ -590,7 +596,7 @@ export function FileClassificationScreen({ api }: FileClassificationScreenProps)
             >
               <span className="plus-circle"><Plus /></span>
               <strong>继续拖拽文件到这里</strong>
-              <small>支持 PDF / DOCX / XLSX / TXT，最大 50 MB</small>
+              <small>支持便携文档、文字文档、表格文档和纯文本，最大 50 兆字节</small>
               <span className="secondary">继续添加文件</span>
             </button>
             <div className="pending-list">
@@ -757,7 +763,7 @@ export function FileClassificationScreen({ api }: FileClassificationScreenProps)
             const workflowStatus = candidateStatus[candidate.state];
             const saveState = saveStates[candidate.id] ?? "clean";
             const saveStatus = candidate.state === "classifying" && saveState === "clean"
-              ? { label: "AI 分类中，可人工覆盖", className: "clean" }
+              ? { label: "智能分类中，可人工覆盖", className: "clean" }
               : candidateSaveStatus[saveState];
             const pending = pendingIds.has(candidate.id);
             return (
@@ -832,11 +838,11 @@ export function FileClassificationScreen({ api }: FileClassificationScreenProps)
       {dialog?.kind === "bulk-confirm" ? (
         <Modal
           title="确认所选分类结果"
-          subtitle={`将确认 ${selectedCandidates.length} 个文件，其中 ${classifyingSelected} 个仍在 AI 分类中。`}
+          subtitle={`将确认 ${selectedCandidates.length} 个文件，其中 ${classifyingSelected} 个仍在智能分类中。`}
           onClose={() => setDialog(null)}
         >
           <p className="dialog-copy">
-            分类中的文件会采用当前人工填写结果；后续 AI 回写将被忽略。成功文件会立即进入分类任务池。
+            分类中的文件会采用当前人工填写结果；后续智能分类结果将被忽略。成功文件会立即进入分类任务池。
           </p>
           <div className="modal-actions">
             <button className="secondary" type="button" onClick={() => setDialog(null)}>取消</button>

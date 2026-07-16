@@ -66,7 +66,7 @@ describe("MockDocumentRepository.list", () => {
 
     expect(result.items.map((document) => document.name)).toEqual([
       "法律法规汇编.pdf",
-      "XX项目合同.pdf",
+      "示例项目合同.pdf",
       "采购管理办法.docx",
     ]);
   });

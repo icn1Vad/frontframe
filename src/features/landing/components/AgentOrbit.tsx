@@ -12,12 +12,12 @@ interface Agent {
 }
 
 const agents: Agent[] = [
-  { label: "TaskManager", angle: 0, radius: 1.64, height: 0.15, highlight: true },
-  { label: "Scheduler", angle: 1.04, radius: 1.52, height: 0.62 },
-  { label: "Registry", angle: 2.08, radius: 1.68, height: -0.18, highlight: true },
-  { label: "Tool Gateway", angle: 3.12, radius: 1.56, height: 0.36, highlight: true },
-  { label: "Session & Trace", angle: 4.72, radius: 1.55, height: -0.72 },
-  { label: "Data Access", angle: 5.22, radius: 1.5, height: 0.08 },
+  { label: "任务管理", angle: 0, radius: 1.64, height: 0.15, highlight: true },
+  { label: "调度中心", angle: 1.04, radius: 1.52, height: 0.62 },
+  { label: "注册中心", angle: 2.08, radius: 1.68, height: -0.18, highlight: true },
+  { label: "工具网关", angle: 3.12, radius: 1.56, height: 0.36, highlight: true },
+  { label: "会话与追踪", angle: 4.72, radius: 1.55, height: -0.72 },
+  { label: "数据访问", angle: 5.22, radius: 1.5, height: 0.08 },
 ];
 
 function pointFromAgent(agent: Agent): [number, number, number] {
@@ -113,7 +113,7 @@ function CoreNode() {
         transform
         zIndexRange={[20, 0]}
       >
-        <div className="agent-label-card core">ReactAgent Runtime</div>
+        <div className="agent-label-card core">智能执行内核</div>
       </Html>
     </group>
   );

@@ -120,7 +120,7 @@ export function AppShell({
         />
       ) : null}
       <Head>
-        <title>{title} · ProofSpace</title>
+        <title>{title} · 明证智能</title>
       </Head>
       <a className="skip-link" href="#main-content">
         跳到主要内容

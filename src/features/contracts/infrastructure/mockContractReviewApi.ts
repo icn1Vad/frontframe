@@ -207,7 +207,7 @@ export const mockContractReviewApi: ContractReviewApi = {
 
   async getEditorSession(taskId) {
     if (typeof window === "undefined") {
-      return { provider: "mock", reason: "WPS WebOffice 仅在浏览器中初始化" };
+      return { provider: "mock", reason: "在线编辑器仅在浏览器中初始化" };
     }
     try {
       const response = await fetch(
@@ -220,7 +220,7 @@ export const mockContractReviewApi: ContractReviewApi = {
       const session: unknown = await response.json();
       return isContractEditorSession(session)
         ? session
-        : { provider: "mock", reason: "编辑器会话配置格式无效" };
+        : { provider: "mock", reason: "编辑器会话配置无效" };
     } catch {
       return { provider: "mock", reason: "编辑器会话接口暂不可用" };
     }

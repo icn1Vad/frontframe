@@ -41,8 +41,8 @@ function formatDate(value: string): string {
 
 function formatBytes(size: number): string {
   return size >= 1024 * 1024
-    ? `${(size / 1024 / 1024).toFixed(1)} MB`
-    : `${Math.max(1, Math.round(size / 1024))} KB`;
+    ? `${(size / 1024 / 1024).toFixed(1)} 兆字节`
+    : `${Math.max(1, Math.round(size / 1024))} 千字节`;
 }
 
 export function ContractReviewTasksScreen({ api }: ContractReviewTasksScreenProps) {
@@ -99,9 +99,9 @@ export function ContractReviewTasksScreen({ api }: ContractReviewTasksScreenProp
     <PageStack>
       <PageToolbar className="contract-page-toolbar">
         <div>
-          <div className="contract-eyebrow">CONTRACT REVIEW · TASK POOL</div>
+          <div className="contract-eyebrow">合同审查任务池</div>
           <h2>合同审查任务池</h2>
-          <p>合同确认后直接进入这里；原“文件分类审查 / 审查任务池”保持原样。</p>
+          <p>集中查看合同审查进度、风险报告和入库状态。</p>
         </div>
         <div className="contract-toolbar-actions">
           <button type="button" className="secondary" onClick={() => void loadTasks()} disabled={loading}>
@@ -112,15 +112,10 @@ export function ContractReviewTasksScreen({ api }: ContractReviewTasksScreenProp
           </button>
         </div>
       </PageToolbar>
-      <div className="contract-test-banner">
-        <span className="contract-test-dot" />
-        <strong>前端测试链路</strong>
-        <span>当前使用 mock 服务模拟上传、审查进度、报告和入库；未来可替换为 Java 业务层接口。</span>
-      </div>
       <StatGrid className="contract-stats-row">
         <Surface><span>合同任务总数</span><strong>{counts.total}</strong><small>独立于文件分类任务</small></Surface>
         <Surface><span>待开始</span><strong>{counts.queued}</strong><small>等待人工启动审查</small></Surface>
-        <Surface><span>审查中</span><strong>{counts.reviewing}</strong><small>AI 正在生成分析</small></Surface>
+        <Surface><span>审查中</span><strong>{counts.reviewing}</strong><small>系统正在生成分析</small></Surface>
         <Surface><span>待处理报告</span><strong>{counts.reported}</strong><small>需要人工确认风险</small></Surface>
       </StatGrid>
       <section className="contract-task-section">
@@ -149,7 +144,7 @@ export function ContractReviewTasksScreen({ api }: ContractReviewTasksScreenProp
             <div className="contract-empty-state">
               <FileText size={24} />
               <strong>暂无符合条件的合同任务</strong>
-              <span>上传一份合同开始测试流程。</span>
+              <span>上传一份合同开始审查流程。</span>
               <button type="button" className="secondary" onClick={() => void router.push(routes.contractReview)}>上传合同</button>
             </div>
           ) : null}

@@ -45,13 +45,13 @@ export default async function handler(
 ) {
   if (request.method !== "GET") {
     response.setHeader("Allow", "GET");
-    response.status(405).json({ error: "Method not allowed" });
+    response.status(405).json({ error: "不支持该请求方法" });
     return;
   }
 
   const taskId = single(request.query.taskId);
   if (!taskId) {
-    response.status(400).json({ error: "Contract review task id is required" });
+    response.status(400).json({ error: "缺少合同审查任务标识" });
     return;
   }
 
@@ -72,7 +72,7 @@ export default async function handler(
       response.send(body);
       return;
     } catch {
-      response.status(502).json({ error: "Editor session upstream is unavailable" });
+      response.status(502).json({ error: "在线编辑器会话服务暂不可用" });
       return;
     }
   }
@@ -81,7 +81,7 @@ export default async function handler(
   response.status(200).json(
     configuredSession ?? {
       provider: "mock",
-      reason: "尚未配置 WPS 应用、SDK 地址和服务端回调，当前使用文本模拟编辑器",
+      reason: "在线编辑器尚未完成配置，当前使用文本预览",
     },
   );
 }

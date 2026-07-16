@@ -30,7 +30,7 @@ const operatorLi = {
 
 const classifiedContract = {
   id: createDocumentId("doc_xx_project_contract_v1"),
-  name: "XX项目合同.pdf",
+  name: "示例项目合同.pdf",
   type: "contract",
   level: "department",
   category: "contract",
@@ -146,7 +146,7 @@ export const mockDocumentCollections = {
     },
     {
       id: createDocumentId("doc_xx_project_contract_review_v2"),
-      name: "XX项目合同.pdf",
+      name: "示例项目合同.pdf",
       type: "contract",
       level: "department",
       category: "contract",

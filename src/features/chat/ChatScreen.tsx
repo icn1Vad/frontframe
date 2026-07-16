@@ -63,7 +63,7 @@ export function ChatScreen() {
               </div>
             </div>
             <div className="message message-assistant">
-              <b className="avatar ai">AI</b>
+              <b className="avatar ai">智</b>
               <div className="message-body">
                 <div className="message-author">
                   <strong>制度助手</strong>

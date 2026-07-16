@@ -51,7 +51,7 @@ interface ChatMessage {
 function statusMeta(task: ContractReviewTask) {
   if (task.status === "stored") return { label: "已入库", tone: "success" as const };
   if (task.status === "reported") return { label: "报告已生成", tone: "warning" as const };
-  if (task.status === "reviewing") return { label: "AI 审查中", tone: "info" as const };
+  if (task.status === "reviewing") return { label: "智能审查中", tone: "info" as const };
   return { label: "待开始", tone: "neutral" as const };
 }
 
@@ -111,7 +111,7 @@ export function ContractReviewWorkbenchScreen({
     setWpsReady(ready);
   }, []);
   const handleWpsError = useCallback((message: string) => {
-    setFeedback(`WPS 编辑器：${message}`);
+    setFeedback(`在线编辑器：${message}`);
   }, []);
 
   useEffect(() => {
@@ -188,14 +188,14 @@ export function ContractReviewWorkbenchScreen({
     setActiveTab("risks");
     if (editorMode === "wps") {
       if (!wpsReady || !wpsEditorRef.current) {
-        setFeedback("WPS WebOffice 正在加载，请稍后再定位原文");
+        setFeedback("在线编辑器正在加载，请稍后再定位原文");
         return;
       }
       try {
         await wpsEditorRef.current.locate(riskAnchor(task!, risk));
-        setFeedback("已在 WPS Word 中高亮风险原文");
+        setFeedback("已在在线文档中高亮风险原文");
       } catch (error) {
-        setFeedback(error instanceof Error ? error.message : "WPS 原文定位失败");
+        setFeedback(error instanceof Error ? error.message : "在线文档原文定位失败");
       }
       return;
     }
@@ -212,7 +212,7 @@ export function ContractReviewWorkbenchScreen({
       const usingWps = editorMode === "wps" && editorSession?.provider === "wps";
       if (usingWps && state === "resolved") {
         if (!wpsReady || !wpsEditorRef.current) {
-          throw new Error("WPS WebOffice 尚未准备完成");
+          throw new Error("在线编辑器尚未准备完成");
         }
         await wpsEditorRef.current.applyRevision({
           anchor: riskAnchor(task, risk),
@@ -223,7 +223,7 @@ export function ContractReviewWorkbenchScreen({
       }
       if (usingWps && state === "open" && risk.state === "resolved") {
         if (!wpsReady || !wpsEditorRef.current) {
-          throw new Error("WPS WebOffice 尚未准备完成");
+          throw new Error("在线编辑器尚未准备完成");
         }
         await wpsEditorRef.current.applyRevision({
           anchor: riskAnchor(task, risk, risk.suggestion),
@@ -237,10 +237,10 @@ export function ContractReviewWorkbenchScreen({
       if (state === "resolved" && !usingWps) setSourceView("revision");
       setFeedback(
         state === "resolved"
-          ? usingWps ? "修订已写入 WPS Word 并触发保存" : "修订已应用到测试编辑预览"
+          ? usingWps ? "修订已写入在线文档并触发保存" : "修订已应用到文档预览"
           : state === "ignored"
             ? "风险已记录为人工忽略"
-            : usingWps ? "WPS 修订已撤回并保存" : "风险状态已恢复",
+            : usingWps ? "在线文档修订已撤回并保存" : "风险状态已恢复",
       );
     } catch (error) {
       setFeedback(error instanceof Error ? error.message : "风险状态更新失败");
@@ -278,9 +278,9 @@ export function ContractReviewWorkbenchScreen({
     if (!wpsEditorRef.current || !wpsReady) return;
     try {
       await wpsEditorRef.current.save();
-      setFeedback("WPS Word 已触发保存，服务端应生成新的文件版本");
+      setFeedback("在线文档已保存，服务端将生成新的文件版本");
     } catch (error) {
-      setFeedback(error instanceof Error ? error.message : "WPS Word 保存失败");
+      setFeedback(error instanceof Error ? error.message : "在线文档保存失败");
     }
   };
 
@@ -317,9 +317,9 @@ export function ContractReviewWorkbenchScreen({
       <header className="contract-workbench-header">
         <div className="contract-workbench-title">
           <Link href={routes.contractReviewTasks} className="contract-back-link"><ArrowLeft size={14} /> 返回任务池</Link>
-          <div className="contract-eyebrow">CONTRACT REVIEW · WORKBENCH</div>
+          <div className="contract-eyebrow">合同审查工作台</div>
           <div className="contract-title-line"><FileText size={21} /><h2>{task.name}</h2><Status tone={status.tone}>{status.label}</Status></div>
-          <p>{contractReviewStanceLabels[task.stance]} · 已选择 {task.modules.length} 个审查模块 · 测试任务 {task.id}</p>
+          <p>{contractReviewStanceLabels[task.stance]} · 已选择 {task.modules.length} 个审查模块</p>
         </div>
         <div className="contract-workbench-actions">
           <button type="button" className="secondary" onClick={() => { setFeedback("报告导出动作已预留，后续接入后端文件导出接口"); }} disabled={!reportGenerated}>
@@ -339,7 +339,7 @@ export function ContractReviewWorkbenchScreen({
 
       {!reportGenerated ? (
         <section className="contract-progress-panel">
-          <div className="contract-progress-heading"><div><span>AI 合同审查</span><strong>{progress}%</strong></div><Status tone="info">正在对照文本分析</Status></div>
+          <div className="contract-progress-heading"><div><span>智能合同审查</span><strong>{progress}%</strong></div><Status tone="info">正在对照文本分析</Status></div>
           <div className="contract-progress-track"><i style={{ width: `${progress}%` }} /></div>
           <div className="contract-progress-steps"><span className={progress >= 25 ? "done" : "active"}>读取合同结构</span><ChevronRight size={14} /><span className={progress >= 55 ? "done" : progress >= 25 ? "active" : ""}>执行模块检查</span><ChevronRight size={14} /><span className={progress >= 85 ? "done" : progress >= 55 ? "active" : ""}>生成风险证据</span><ChevronRight size={14} /><span className={progress >= 100 ? "done" : ""}>等待生成报告</span></div>
         </section>
@@ -353,7 +353,7 @@ export function ContractReviewWorkbenchScreen({
       <section className="contract-workbench" aria-label="合同审查工作台">
         <article className="contract-source-panel">
           <div className="contract-source-toolbar">
-            <div><span className="contract-section-kicker">原文对照</span><h3>{editorMode === "wps" ? "WPS 在线编辑" : "合同原文"}</h3></div>
+            <div><span className="contract-section-kicker">原文对照</span><h3>{editorMode === "wps" ? "在线文档编辑" : "合同原文"}</h3></div>
             <div className="contract-editor-toolbar-controls">
               <div className="contract-editor-provider-toggle">
                 <button type="button" className={editorMode === "mock" ? "selected" : ""} onClick={() => setEditorMode("mock")}>文本预览</button>
@@ -364,7 +364,7 @@ export function ContractReviewWorkbenchScreen({
                   title={editorSession?.provider === "mock" ? editorSession.reason : undefined}
                   onClick={() => setEditorMode("wps")}
                 >
-                  WPS WebOffice
+                  在线编辑器
                 </button>
               </div>
               {editorMode === "mock" ? (
@@ -373,13 +373,13 @@ export function ContractReviewWorkbenchScreen({
                   <button type="button" className={sourceView === "revision" ? "selected" : ""} onClick={() => setSourceView("revision")}>修订预览</button>
                 </div>
               ) : (
-                <button type="button" className="secondary contract-wps-save" disabled={!wpsReady} onClick={() => void saveWpsDocument()}><Save size={12} />保存 Word</button>
+                <button type="button" className="secondary contract-wps-save" disabled={!wpsReady} onClick={() => void saveWpsDocument()}><Save size={12} />保存文档</button>
               )}
             </div>
           </div>
           <div className="contract-source-meta">
             <span><FileText size={13} /> {task.name}</span>
-            <span>{editorMode === "wps" ? (wpsReady ? "WPS 已连接" : "WPS 连接中") : "第 1 / 3 页"}</span>
+            <span>{editorMode === "wps" ? (wpsReady ? "编辑器已连接" : "编辑器连接中") : "第 1 / 3 页"}</span>
             <span className="contract-editor-badge"><Highlighter size={12} /> 点击风险卡片可定位原文</span>
           </div>
           {editorMode === "wps" && editorSession?.provider === "wps" ? (
@@ -407,11 +407,11 @@ export function ContractReviewWorkbenchScreen({
                   >
                     <div className="contract-clause-heading"><span>{clause.number}</span><strong>{clause.title}</strong>{risk ? <span className={`contract-clause-marker ${risk.state}`} /> : null}</div>
                     <p>{selected ? <mark>{text}</mark> : text}</p>
-                    {selected && risk ? <small className="contract-clause-source-note">{sourceView === "revision" ? "修订建议预览 · 尚未写入真实 Word" : `风险定位：${risk.title}`}</small> : null}
+                    {selected && risk ? <small className="contract-clause-source-note">{sourceView === "revision" ? "修订建议预览 · 尚未写入原文件" : `风险定位：${risk.title}`}</small> : null}
                   </div>
                 );
               })}
-              <p className="contract-document-signature">（以下为测试合同节选，用于联调原文定位、修订预览和问答引用。）</p>
+              <p className="contract-document-signature">（以下为合同内容节选，用于原文定位、修订预览和问答引用。）</p>
             </div>
           )}
         </article>
@@ -469,7 +469,7 @@ export function ContractReviewWorkbenchScreen({
 
           {activeTab === "chat" ? (
             <div className="contract-chat-panel">
-              <div className="contract-panel-heading"><div><h3>实时问答</h3><p>问答会引用当前合同原文和风险定位，测试阶段使用本地 mock 回复。</p></div></div>
+              <div className="contract-panel-heading"><div><h3>实时问答</h3><p>问答会引用当前合同原文和风险定位，并标明对应内容来源。</p></div></div>
               <div className="contract-chat-messages" aria-live="polite">
                 {messages.map((message) => <div className={`contract-chat-message ${message.role}`} key={message.id}><span className="contract-chat-avatar">{message.role === "assistant" ? <Sparkles size={13} /> : "我"}</span><div><p>{message.text}</p>{message.citation ? <small><Highlighter size={11} /> {message.citation}</small> : null}</div></div>)}
                 {chatPending ? <div className="contract-chat-message assistant"><span className="contract-chat-avatar"><Sparkles size={13} /></span><div><p className="contract-chat-typing">正在结合合同原文分析…</p></div></div> : null}

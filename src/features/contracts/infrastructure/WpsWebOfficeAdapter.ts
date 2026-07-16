@@ -58,9 +58,9 @@ function loadWpsWebOfficeSdk(url: string): Promise<WpsWebOfficeSdk> {
     script.dataset.proofspaceWpsSdk = "true";
     script.onload = () => {
       if (window.WebOfficeSDK) resolve(window.WebOfficeSDK);
-      else reject(new Error("WPS WebOffice SDK 已加载，但未找到 WebOfficeSDK 全局对象"));
+      else reject(new Error("在线编辑器脚本已加载，但未找到可用的编辑器对象"));
     };
-    script.onerror = () => reject(new Error("WPS WebOffice SDK 加载失败"));
+    script.onerror = () => reject(new Error("在线编辑器脚本加载失败"));
     document.head.appendChild(script);
   });
 
@@ -74,10 +74,10 @@ async function refreshWpsToken(url: string): Promise<WpsTokenData> {
     method: "POST",
     headers: { Accept: "application/json" },
   });
-  if (!response.ok) throw new Error(`WPS token 刷新失败：${response.status}`);
+  if (!response.ok) throw new Error(`在线编辑器授权刷新失败：${response.status}`);
   const token = await response.json() as Partial<WpsTokenData>;
   if (!token.token || !Number.isFinite(token.timeout)) {
-    throw new Error("WPS token 刷新接口返回格式无效");
+    throw new Error("在线编辑器授权刷新接口返回格式无效");
   }
   return { token: token.token, timeout: token.timeout! };
 }
@@ -156,7 +156,7 @@ export class WpsWebOfficeAdapter {
   }
 
   async save(): Promise<void> {
-    if (!this.instance) throw new Error("WPS WebOffice 尚未初始化");
+    if (!this.instance) throw new Error("在线编辑器尚未初始化");
     await this.instance.save();
   }
 
@@ -167,7 +167,7 @@ export class WpsWebOfficeAdapter {
   }
 
   private getDocument(): WpsDocument {
-    if (!this.application) throw new Error("WPS WebOffice 尚未准备完成");
+    if (!this.application) throw new Error("在线编辑器尚未准备完成");
     return this.application.ActiveDocument;
   }
 
@@ -184,7 +184,7 @@ export class WpsWebOfficeAdapter {
       anchor.quotedText,
       anchor.occurrence ?? 0,
     );
-    if (start < 0) throw new Error("未在当前 Word 版本中找到风险对应原文");
+    if (start < 0) throw new Error("未在当前文档版本中找到风险对应原文");
     return document.Range(start, start + anchor.quotedText.length);
   }
 }

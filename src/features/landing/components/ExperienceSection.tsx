@@ -23,7 +23,7 @@ export function ExperienceSection() {
             <SectionTitle
               align="left"
               className="landing-experience-title [&_h2]:text-3xl [&_h2]:leading-tight md:[&_h2]:text-4xl"
-              eyebrow="Experience"
+              eyebrow="产品体验"
               title={
                 <>
                   企业文件治理，
@@ -40,9 +40,9 @@ export function ExperienceSection() {
               登录后进入统一工作区，继续完成文件分类、风险审查、知识归档与溯源问答。
             </p>
             <div className="landing-experience-mark" aria-hidden="true">
-              <span>Review</span>
-              <span>Trace</span>
-              <span>Govern</span>
+              <span>审查</span>
+              <span>追踪</span>
+              <span>治理</span>
             </div>
           </div>
 
@@ -50,8 +50,8 @@ export function ExperienceSection() {
         </motion.div>
 
         <footer className="mt-10 flex flex-col justify-between gap-3 text-sm text-muted md:flex-row">
-          <p>ProofSpace © 2026</p>
-          <p>AI Review Engine for Enterprise Knowledge Governance</p>
+          <p>明证智能 版权所有 2026</p>
+          <p>企业知识审查与治理引擎</p>
         </footer>
       </div>
     </section>

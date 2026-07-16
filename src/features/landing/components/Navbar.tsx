@@ -21,7 +21,7 @@ export function Navbar() {
         className="relative z-10 mx-auto flex h-20 max-w-[1280px] items-center justify-between px-5 md:px-8"
       >
         <a
-          aria-label="ProofSpace 首页"
+          aria-label="返回产品首页"
           className="font-display text-2xl leading-none tracking-normal text-ink"
           href="#product"
         >

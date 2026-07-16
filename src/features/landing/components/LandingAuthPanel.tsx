@@ -114,7 +114,7 @@ export function LandingAuthPanel() {
   }
 
   const isLogin = mode === "login";
-  const title = isLogin ? "登录 ProofSpace" : "申请访问 ProofSpace";
+  const title = isLogin ? "登录工作区" : "申请访问工作区";
   const description = isLogin
     ? "输入账号信息，进入企业知识治理工作区。"
     : "提交账号申请，权限需由管理员在服务端审核。";

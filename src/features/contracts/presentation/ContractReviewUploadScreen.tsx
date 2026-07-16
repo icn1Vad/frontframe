@@ -21,9 +21,9 @@ interface PendingContract {
 }
 
 function formatFileSize(size: number): string {
-  if (size < 1024) return `${size} B`;
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
-  return `${(size / 1024 / 1024).toFixed(1)} MB`;
+  if (size < 1024) return `${size} 字节`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} 千字节`;
+  return `${(size / 1024 / 1024).toFixed(1)} 兆字节`;
 }
 
 function isSupportedContract(file: File): boolean {
@@ -52,7 +52,7 @@ export function ContractReviewUploadScreen({
   const addFile = (file: File | undefined) => {
     if (!file) return;
     if (!isSupportedContract(file)) {
-      setFeedback("合同审查测试页目前只接受 DOCX 或 PDF 文件");
+      setFeedback("合同审查目前只接受文字文档或便携文档");
       return;
     }
     setPendingFile({ name: file.name, size: file.size });
@@ -105,9 +105,9 @@ export function ContractReviewUploadScreen({
       <PageStack>
         <PageToolbar className="contract-page-toolbar">
           <div>
-            <div className="contract-eyebrow">CONTRACT REVIEW · TEST FLOW</div>
+            <div className="contract-eyebrow">合同审查</div>
             <h2>上传待审查合同</h2>
-            <p>这是独立的合同审查测试链路，不会改变原来的文件分类审查流程。</p>
+            <p>上传合同并设置审查范围，确认后进入合同审查任务池。</p>
           </div>
           <button
             type="button"
@@ -136,7 +136,7 @@ export function ContractReviewUploadScreen({
           >
             <span className="contract-dropzone-icon"><UploadCloud size={30} /></span>
             <strong>将合同拖入这里，或点击选择文件</strong>
-            <small>支持 DOCX / PDF，单个文件最大 50 MB</small>
+            <small>支持文字文档和便携文档，单个文件最大 50 兆字节</small>
             <span className="secondary">选择合同文件</span>
           </button>
           <div className="contract-upload-note">
@@ -153,7 +153,7 @@ export function ContractReviewUploadScreen({
     <PageStack>
       <PageToolbar className="contract-page-toolbar">
         <div>
-          <div className="contract-eyebrow">CONTRACT REVIEW · CONFIRMATION</div>
+          <div className="contract-eyebrow">合同审查配置</div>
           <h2>确认合同审查配置</h2>
           <p>确认后任务会进入合同审查任务池，原文件分类任务池不受影响。</p>
         </div>
@@ -194,7 +194,7 @@ export function ContractReviewUploadScreen({
               </button>
             </div>
             <div className="contract-confirm-hint">
-              <Check size={15} /> 文件仅在本地测试服务中登记元数据，后续接入后端时替换为真实上传接口。
+              <Check size={15} /> 文件信息已读取，请核对名称和审查配置后创建任务。
             </div>
           </section>
 
@@ -215,7 +215,7 @@ export function ContractReviewUploadScreen({
             </label>
             <fieldset className="contract-module-fieldset">
               <legend>合同审查模块</legend>
-              <p>至少选择一个模块，AI 将只按选中的范围生成风险报告。</p>
+              <p>至少选择一个模块，系统将只按选中的范围生成风险报告。</p>
               <div className="contract-module-options">
                 {contractReviewModuleDefinitions.map((module) => (
                   <label key={module.id} className="contract-module-option">

@@ -24,8 +24,8 @@ export function AuthFormShell({
 }: AuthFormShellProps) {
   return (
     <main className="auth-page">
-      <section className="auth-brand" aria-label="ProofSpace">
-        <h1>ProofSpace</h1>
+      <section className="auth-brand" aria-label="明证智能">
+        <h1>明证智能</h1>
         <p>企业制度智能治理平台</p>
         <span>可审查 · 可追溯 · 可治理</span>
       </section>
@@ -53,4 +53,3 @@ export function AuthFormShell({
     </main>
   );
 }
-

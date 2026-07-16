@@ -58,7 +58,7 @@ export const WpsWebOfficeEditor = forwardRef<
       onReadyChange?.(true);
     }).catch((error: unknown) => {
       if (!active) return;
-      const message = error instanceof Error ? error.message : "WPS WebOffice 初始化失败";
+      const message = error instanceof Error ? error.message : "在线编辑器初始化失败";
       setState("error");
       setErrorMessage(message);
       onError?.(message);
@@ -76,26 +76,26 @@ export const WpsWebOfficeEditor = forwardRef<
   useEffect(() => {
     if (state !== "ready" || !activeAnchor) return;
     void adapterRef.current?.locate(activeAnchor).catch((error: unknown) => {
-      onError?.(error instanceof Error ? error.message : "WPS 原文定位失败");
+      onError?.(error instanceof Error ? error.message : "在线文档原文定位失败");
     });
   }, [activeAnchor, onError, state]);
 
   useImperativeHandle(ref, () => ({
     async locate(anchor) {
       if (!adapterRef.current || state !== "ready") {
-        throw new Error("WPS WebOffice 尚未准备完成");
+        throw new Error("在线编辑器尚未准备完成");
       }
       await adapterRef.current.locate(anchor);
     },
     async applyRevision(revision) {
       if (!adapterRef.current || state !== "ready") {
-        throw new Error("WPS WebOffice 尚未准备完成");
+        throw new Error("在线编辑器尚未准备完成");
       }
       await adapterRef.current.applyRevision(revision);
     },
     async save() {
       if (!adapterRef.current || state !== "ready") {
-        throw new Error("WPS WebOffice 尚未准备完成");
+        throw new Error("在线编辑器尚未准备完成");
       }
       await adapterRef.current.save();
     },
@@ -107,14 +107,14 @@ export const WpsWebOfficeEditor = forwardRef<
       {state === "loading" ? (
         <div className="wps-editor-overlay" role="status">
           <LoaderCircle className="wps-editor-loader" size={26} />
-          <strong>正在加载 WPS WebOffice</strong>
+          <strong>正在加载在线编辑器</strong>
           <span>编辑器准备完成后将自动定位当前风险原文。</span>
         </div>
       ) : null}
       {state === "error" ? (
         <div className="wps-editor-overlay error" role="alert">
           <AlertTriangle size={25} />
-          <strong>WPS WebOffice 加载失败</strong>
+          <strong>在线编辑器加载失败</strong>
           <span>{errorMessage}</span>
           <button type="button" className="secondary" onClick={() => setAttempt((value) => value + 1)}>
             <RefreshCw size={13} /> 重试

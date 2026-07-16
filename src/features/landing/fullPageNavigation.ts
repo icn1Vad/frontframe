@@ -1,7 +1,7 @@
 export const LANDING_SECTIONS = [
   { id: "product", label: "产品概况" },
   { id: "technology", label: "技术架构" },
-  { id: "experience", label: "Experience 与登录" },
+  { id: "experience", label: "产品体验与登录" },
 ] as const;
 
 export type LandingSectionId = (typeof LANDING_SECTIONS)[number]["id"];

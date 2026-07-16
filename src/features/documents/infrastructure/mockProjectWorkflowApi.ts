@@ -49,7 +49,7 @@ const initialCandidates: readonly ClassificationCandidateRecord[] = [
   },
   {
     id: createClassificationCandidateId("candidate_project_contract"),
-    name: "XX项目合同.pdf",
+    name: "示例项目合同.pdf",
     type: "contract",
     level: "department",
     category: "contract",
