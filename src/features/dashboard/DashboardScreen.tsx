@@ -29,14 +29,20 @@ const flowColumns = [
   {
     id: "pending",
     label: "待审查",
+    href: routes.classificationTasks,
+    action: "分类任务池",
   },
   {
     id: "reviewing",
     label: "审查中",
+    href: routes.reviewTasks,
+    action: "审查任务池",
   },
   {
     id: "reviewed",
     label: "已审查",
+    href: routes.reviewTasks,
+    action: "审查任务池",
   },
 ] as const;
 
@@ -95,10 +101,14 @@ export function DashboardScreen({ overview }: DashboardScreenProps) {
             </strong>
             {flowColumns.map((column) => (
               <span role="cell" key={column.id}>
-                <b>
-                  {row[column.id]}
+                <b className="flow-count">
+                  <strong>{row[column.id]}</strong>
                   <small>项</small>
                 </b>
+                <Link className="flow-cell-link" href={column.href}>
+                  {column.action}
+                  <ArrowRight size={13} />
+                </Link>
               </span>
             ))}
           </div>
