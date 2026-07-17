@@ -5,6 +5,7 @@ import type {
   ChatMessage,
   ChatStreamHandlers,
 } from "../../app/services";
+import { ChatStreamError } from "../../features/chat/ChatStreamError";
 import type { MutationOptions } from "../../features/documents/application";
 import { HttpClient } from "./HttpClient";
 
@@ -19,7 +20,7 @@ interface CitationDto {
   readonly sourceId: string;
   readonly sourceName: string;
   readonly location?: string;
-  readonly excerpt: string;
+  readonly excerpt: string | null;
 }
 
 interface MessageDto {
@@ -84,26 +85,34 @@ function parseBlock(block: string): SseEvent | null {
 
 async function consumeSse(
   response: Response,
-  onEvent: (event: SseEvent) => void,
+  onEvent: (event: SseEvent) => "continue" | "stop",
 ): Promise<void> {
   if (!response.body) throw new Error("服务器未返回流式响应");
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
-  while (true) {
-    const { value, done } = await reader.read();
-    buffer += decoder.decode(value, { stream: !done }).replace(/\r\n/g, "\n");
-    let boundary = buffer.indexOf("\n\n");
-    while (boundary >= 0) {
-      const parsed = parseBlock(buffer.slice(0, boundary));
-      buffer = buffer.slice(boundary + 2);
-      if (parsed) onEvent(parsed);
-      boundary = buffer.indexOf("\n\n");
+  let streamEnded = false;
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      buffer += decoder.decode(value, { stream: !done }).replace(/\r\n/g, "\n");
+      let boundary = buffer.indexOf("\n\n");
+      while (boundary >= 0) {
+        const parsed = parseBlock(buffer.slice(0, boundary));
+        buffer = buffer.slice(boundary + 2);
+        if (parsed && onEvent(parsed) === "stop") return;
+        boundary = buffer.indexOf("\n\n");
+      }
+      if (done) {
+        streamEnded = true;
+        break;
+      }
     }
-    if (done) break;
+    const trailing = parseBlock(buffer.trim());
+    if (trailing) onEvent(trailing);
+  } finally {
+    if (!streamEnded) await reader.cancel().catch(() => undefined);
   }
-  const trailing = parseBlock(buffer.trim());
-  if (trailing) onEvent(trailing);
 }
 
 function parseJson<T>(value: string, event: string): T {
@@ -115,6 +124,8 @@ function parseJson<T>(value: string, event: string): T {
 }
 
 export class BusinessChatApi implements ChatApi {
+  private readonly conversations = new Map<string, ConversationDto>();
+
   constructor(
     private readonly getAccessToken: () => string | undefined,
     private readonly onUnauthorized: () => void,
@@ -126,18 +137,20 @@ export class BusinessChatApi implements ChatApi {
       "/business/chat/conversations",
       { query: { page: 1, size: 100 } },
     );
+    data.list.forEach((conversation) => this.conversations.set(conversation.conversationId, conversation));
     return data.list.map((conversation) => mapConversation(conversation));
   }
 
   async getConversation(id: string): Promise<ChatConversation | undefined> {
-    const [conversation, messages] = await Promise.all([
-      this.client.request<ConversationDto>(
-        `/business/chat/conversations/${encodeURIComponent(id)}`,
-      ),
-      this.client.request<readonly MessageDto[]>(
-        `/business/chat/conversations/${encodeURIComponent(id)}/messages`,
-      ),
-    ]);
+    let conversation = this.conversations.get(id);
+    if (!conversation) {
+      await this.listConversations();
+      conversation = this.conversations.get(id);
+    }
+    if (!conversation) return undefined;
+    const messages = await this.client.request<readonly MessageDto[]>(
+      `/business/chat/conversations/${encodeURIComponent(id)}/messages`,
+    );
     return mapConversation(conversation, messages.map(mapMessage));
   }
 
@@ -154,6 +167,7 @@ export class BusinessChatApi implements ChatApi {
         signal: options.signal,
       },
     );
+    this.conversations.set(conversation.conversationId, conversation);
     return mapConversation(conversation);
   }
 
@@ -162,6 +176,7 @@ export class BusinessChatApi implements ChatApi {
       `/business/chat/conversations/${encodeURIComponent(id)}`,
       { method: "DELETE", signal: options.signal },
     );
+    this.conversations.delete(id);
   }
 
   async sendMessage(
@@ -169,26 +184,38 @@ export class BusinessChatApi implements ChatApi {
     question: string,
     options: MutationOptions & ChatStreamHandlers,
   ): Promise<ChatMessage> {
+    const normalizedQuestion = question.trim();
+    if (!normalizedQuestion) throw new Error("问题内容不能为空");
+    if (normalizedQuestion.length > 4000) throw new Error("问题最多 4000 个字符");
     const token = this.getAccessToken();
     if (!token) {
       this.onUnauthorized();
       throw new Error("登录状态已失效，请重新登录");
     }
-    const response = await fetch(
-      `/business/chat/conversations/${encodeURIComponent(conversationId)}/messages/stream`,
-      {
-        method: "POST",
-        credentials: "include",
-        signal: options.signal,
-        headers: {
-          Accept: "text/event-stream",
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-          "Idempotency-Key": options.idempotencyKey,
+    let response: Response;
+    try {
+      response = await fetch(
+        `/business/chat/conversations/${encodeURIComponent(conversationId)}/messages/stream`,
+        {
+          method: "POST",
+          credentials: "include",
+          signal: options.signal,
+          headers: {
+            Accept: "text/event-stream",
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+            "Idempotency-Key": options.idempotencyKey,
+          },
+          body: JSON.stringify({ content: normalizedQuestion }),
         },
-        body: JSON.stringify({ content: question.trim() }),
-      },
-    );
+      );
+    } catch (error) {
+      throw new ChatStreamError(
+        error instanceof Error ? error.message : "流式问答连接失败",
+        true,
+        "CHAT_STREAM_CONNECTION_FAILED",
+      );
+    }
     const contentType = response.headers.get("content-type") ?? "";
     if (!response.ok || !contentType.includes("text/event-stream")) {
       const payload = await response.json().catch(() => null) as {
@@ -203,8 +230,9 @@ export class BusinessChatApi implements ChatApi {
     let content = "";
     const citations: ChatCitation[] = [];
     let finished = false;
-    await consumeSse(response, ({ event, data }) => {
-      if (event === "meta") {
+    try {
+      await consumeSse(response, ({ event, data }) => {
+        if (event === "meta") {
         const meta = parseJson<{
           requestId: string;
           conversationId: string;
@@ -212,29 +240,48 @@ export class BusinessChatApi implements ChatApi {
         }>(data, event);
         messageId = meta.messageId;
         options.onMeta?.(meta);
+        return "continue";
       } else if (event === "delta") {
         const delta = parseJson<{ content: string }>(data, event);
         content += delta.content;
         options.onDelta?.(delta.content);
+        return "continue";
       } else if (event === "citation") {
         const citation = mapCitation(
           parseJson<{ citation: CitationDto }>(data, event).citation,
         );
         citations.push(citation);
         options.onCitation?.(citation);
+        return "continue";
       } else if (event === "done") {
         messageId = parseJson<{ messageId: string }>(data, event).messageId;
         finished = true;
+        return "stop";
       } else if (event === "error") {
         const error = parseJson<{
           errorCode: string;
           errorMessage: string;
           retryable: boolean;
         }>(data, event);
-        throw new Error(`${error.errorMessage}${error.retryable ? "（可重试）" : ""}`);
-      }
-    });
-    if (!finished) throw new Error("流式回答在 done 事件前中断");
+        throw new ChatStreamError(error.errorMessage, error.retryable, error.errorCode);
+        }
+        return "continue";
+      });
+    } catch (error) {
+      if (error instanceof ChatStreamError) throw error;
+      throw new ChatStreamError(
+        error instanceof Error ? error.message : "流式回答读取中断",
+        true,
+        "CHAT_STREAM_INTERRUPTED",
+      );
+    }
+    if (!finished) {
+      throw new ChatStreamError(
+        "流式回答在 done 事件前中断",
+        true,
+        "CHAT_STREAM_INTERRUPTED",
+      );
+    }
     return {
       id: messageId,
       role: "assistant",

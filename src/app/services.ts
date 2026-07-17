@@ -1,6 +1,5 @@
 import type { AuthApi } from "../features/auth";
 import type { ContractReviewApi } from "../features/contracts/application";
-import { mockContractReviewApi } from "../features/contracts/infrastructure";
 import type {
   ClassificationTaskPoolApi,
   ClassificationWorkflowApi,
@@ -15,13 +14,9 @@ import {
   MockKnowledgeApi,
   mockDocumentRepository,
 } from "../features/documents/infrastructure";
-import {
-  createDocumentId,
-  createIsoDateTime,
-  createUserId,
-} from "../features/documents/domain";
 import { ContinewAuthApi } from "../infrastructure/http/ContinewAuthApi";
 import { BusinessChatApi } from "../infrastructure/http/BusinessChatApi";
+import { BusinessContractReviewApi } from "../infrastructure/http/BusinessContractReviewApi";
 import { BusinessReviewApi } from "../infrastructure/http/BusinessReviewApi";
 import { HttpClient } from "../infrastructure/http/HttpClient";
 import { clearAccessToken, getAccessToken } from "../shared/lib/accessToken";
@@ -41,7 +36,7 @@ export interface ChatCitation {
   readonly documentId: string;
   readonly documentName: string;
   readonly location?: string;
-  readonly excerpt: string;
+  readonly excerpt: string | null;
 }
 
 export interface ChatStreamHandlers {
@@ -120,32 +115,7 @@ const classificationTasks = new MockClassificationTaskPoolApi(
 );
 const reviewTasks = businessReview;
 const knowledge = new MockKnowledgeApi(mockDocumentRepository);
-const contractReviewAdapter = mockContractReviewApi;
-
-const contractReview: ContractReviewApi = {
-  ...contractReviewAdapter,
-  async storeTask(taskId, options) {
-    const task = await contractReviewAdapter.storeTask(taskId, options);
-    mockDocumentRepository.upsert("knowledge", {
-      id: createDocumentId(`contract_knowledge_${task.id}`),
-      name: task.name,
-      type: "contract",
-      level: "company",
-      category: "contract",
-      state: {
-        kind: "published",
-        source: "contract-review",
-        contractTaskId: task.id,
-        publishedAt: createIsoDateTime(new Date().toISOString()),
-      },
-      operator: {
-        id: createUserId("current_user"),
-        displayName: "当前用户",
-      },
-    });
-    return task;
-  },
-};
+const contractReview: ContractReviewApi = new BusinessContractReviewApi(businessClient);
 
 const dashboard: DashboardApi = {
   async getOverview() {

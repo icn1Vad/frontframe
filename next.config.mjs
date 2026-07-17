@@ -11,6 +11,10 @@ const nextConfig = {
         source: "/api/v1/:path*",
         destination: `${apiBackendOrigin}/api/v1/:path*`,
       },
+      {
+        source: "/business/:path*",
+        destination: `${apiBackendOrigin}/business/:path*`,
+      },
     ];
   },
   async redirects() {

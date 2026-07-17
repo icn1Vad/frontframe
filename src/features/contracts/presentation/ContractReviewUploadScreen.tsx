@@ -1,13 +1,8 @@
-import { ArrowRight, Check, FileText, Plus, Settings2, UploadCloud, X } from "lucide-react";
+import { ArrowRight, Check, FileText, Plus, UploadCloud, X } from "lucide-react";
 import { useRef, useState, type ChangeEvent, type DragEvent } from "react";
 import { useRouter } from "next/router";
-import type { ContractReviewApi } from "../application";
-import {
-  contractReviewModuleDefinitions,
-  contractReviewStanceLabels,
-  type ContractReviewModuleId,
-  type ContractReviewStance,
-} from "../domain";
+import type { ContractReviewApi, UploadedContractDocument } from "../application";
+import { contractReviewModuleDefinitions } from "../domain";
 import { routes } from "../../../app";
 import { createIdempotencyKey } from "../../../shared/lib/idempotency";
 import { PageStack, PageToolbar, Status, Surface } from "../../../shared/ui";
@@ -16,240 +11,177 @@ export interface ContractReviewUploadScreenProps {
   readonly api: ContractReviewApi;
 }
 
-interface PendingContract {
-  readonly name: string;
-  readonly size: number;
-  readonly file: File;
-}
-
 function formatFileSize(size: number): string {
   if (size < 1024) return `${size} 字节`;
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} 千字节`;
   return `${(size / 1024 / 1024).toFixed(1)} 兆字节`;
 }
 
-function isSupportedContract(file: File): boolean {
+function isSupportedDocument(file: File): boolean {
   return /\.(docx|pdf)$/i.test(file.name);
 }
 
-export function ContractReviewUploadScreen({
-  api,
-}: ContractReviewUploadScreenProps) {
+export function ContractReviewUploadScreen({ api }: ContractReviewUploadScreenProps) {
   const router = useRouter();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [pendingFile, setPendingFile] = useState<PendingContract | null>(null);
+  const contractInputRef = useRef<HTMLInputElement>(null);
+  const policyInputRef = useRef<HTMLInputElement>(null);
+  const [contractFile, setContractFile] = useState<File | null>(null);
+  const [policyFiles, setPolicyFiles] = useState<readonly File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
-  const [name, setName] = useState("");
-  const [stance, setStance] = useState<ContractReviewStance>("neutral");
-  const [modules, setModules] = useState<ContractReviewModuleId[]>([
-    "transaction",
-    "performance-payment",
-    "data-security",
-    "intellectual-property",
-    "termination",
-  ]);
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
-  const addFile = (file: File | undefined) => {
+  const setContract = (file: File | undefined) => {
     if (!file) return;
-    if (!isSupportedContract(file)) {
-      setFeedback("合同审查目前只接受文字文档或便携文档");
+    if (!isSupportedDocument(file)) {
+      setFeedback("合同文件仅支持 .docx 或 .pdf");
       return;
     }
-    setPendingFile({ name: file.name, size: file.size, file });
-    setName(file.name);
+    setContractFile(file);
     setFeedback(null);
   };
 
-  const handleFileInput = (event: ChangeEvent<HTMLInputElement>) => {
-    addFile(event.target.files?.[0]);
+  const addPolicies = (files: FileList | readonly File[]) => {
+    const incoming = Array.from(files);
+    if (incoming.some((file) => !isSupportedDocument(file))) {
+      setFeedback("制度依据仅支持 .docx 或 .pdf");
+      return;
+    }
+    setPolicyFiles((current) => {
+      const unique = [...current];
+      for (const file of incoming) {
+        if (!unique.some((item) => item.name === file.name && item.size === file.size)) unique.push(file);
+      }
+      if (unique.length > 20) {
+        setFeedback("制度依据最多选择 20 份");
+        return unique.slice(0, 20);
+      }
+      setFeedback(null);
+      return unique;
+    });
+  };
+
+  const handleContractInput = (event: ChangeEvent<HTMLInputElement>) => {
+    setContract(event.target.files?.[0]);
     event.target.value = "";
   };
 
-  const handleDrop = (event: DragEvent<HTMLElement>) => {
-    event.preventDefault();
-    setIsDragging(false);
-    addFile(event.dataTransfer.files[0]);
+  const handlePolicyInput = (event: ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files) addPolicies(event.target.files);
+    event.target.value = "";
   };
 
-  const toggleModule = (moduleId: ContractReviewModuleId) => {
-    setModules((current) =>
-      current.includes(moduleId)
-        ? current.filter((item) => item !== moduleId)
-        : [...current, moduleId],
-    );
+  const handleContractDrop = (event: DragEvent<HTMLElement>) => {
+    event.preventDefault();
+    setIsDragging(false);
+    setContract(event.dataTransfer.files[0]);
   };
 
   const confirmTask = async () => {
-    if (!pendingFile || !name.trim() || modules.length === 0) return;
+    if (!contractFile || policyFiles.length < 1 || policyFiles.length > 20) return;
     setSubmitting(true);
-    setFeedback(null);
+    setFeedback("正在上传合同文件…");
     try {
+      const contract = await api.uploadDocument(contractFile, "CONTRACT", {
+        idempotencyKey: createIdempotencyKey("upload-contract-document"),
+      });
+      const policies: UploadedContractDocument[] = [];
+      for (let index = 0; index < policyFiles.length; index += 1) {
+        setFeedback(`正在上传制度依据（${index + 1}/${policyFiles.length}）…`);
+        policies.push(await api.uploadDocument(policyFiles[index], "POLICY", {
+          idempotencyKey: createIdempotencyKey("upload-contract-policy"),
+        }));
+      }
+      setFeedback("文件上传完成，正在创建合同审查任务…");
       const createdTask = await api.createTask({
-        file: pendingFile.file,
-        name: name.trim(),
-        size: pendingFile.size,
-        stance,
-        modules,
+        contractFileId: contract.fileId,
+        policyFileIds: policies.map((policy) => policy.fileId),
+        name: contract.fileName,
+        size: contract.size,
+        stance: "neutral",
+        modules: contractReviewModuleDefinitions.map((module) => module.id),
       }, {
         idempotencyKey: createIdempotencyKey("create-contract-review"),
       });
-      await api.startReview(createdTask.id, {
-        idempotencyKey: createIdempotencyKey("start-contract-review"),
-        expectedVersion: createdTask.version,
-      });
       await router.push(routes.contractReviewTask(createdTask.id));
     } catch (error) {
-      setFeedback(
-        error instanceof Error ? `创建审查任务失败：${error.message}` : "创建审查任务失败，请稍后重试",
-      );
+      setFeedback(error instanceof Error ? `开始审查失败：${error.message}` : "开始审查失败，请稍后重试");
     } finally {
       setSubmitting(false);
     }
   };
 
-  if (!pendingFile) {
-    return (
-      <PageStack>
-        <PageToolbar className="contract-page-toolbar">
-          <div>
-            <div className="contract-eyebrow">合同专项审查</div>
-            <h2>上传待审查合同</h2>
-            <p>用于条款级合同专项审查，可直接上传并配置审查范围，无需先进入文件分类流程。</p>
-          </div>
-          <button
-            type="button"
-            className="secondary"
-            onClick={() => void router.push(routes.contractReviewTasks)}
-          >
-            查看合同任务池 <ArrowRight size={14} />
-          </button>
-        </PageToolbar>
-        <Surface className="contract-upload-card">
-          <input
-            ref={fileInputRef}
-            className="visually-hidden"
-            type="file"
-            accept=".docx,.pdf"
-            onChange={handleFileInput}
-          />
-          <button
-            type="button"
-            className={`contract-dropzone${isDragging ? " dragging" : ""}`}
-            onClick={() => fileInputRef.current?.click()}
-            onDragEnter={() => setIsDragging(true)}
-            onDragOver={(event) => event.preventDefault()}
-            onDragLeave={() => setIsDragging(false)}
-            onDrop={handleDrop}
-          >
-            <span className="contract-dropzone-icon"><UploadCloud size={30} /></span>
-            <strong>将合同拖入这里，或点击选择文件</strong>
-            <small>支持文字文档和便携文档，单个文件最大 50 兆字节</small>
-            <span className="secondary">选择合同文件</span>
-          </button>
-          <div className="contract-upload-note">
-            <Settings2 size={16} />
-            <span>上传后可修改文件名称、审查偏向和检查模块，开始审查后直接进入合同审查工作台。</span>
-          </div>
-        </Surface>
-        {feedback ? <p className="action-feedback error">{feedback}</p> : null}
-      </PageStack>
-    );
-  }
-
   return (
     <PageStack>
       <PageToolbar className="contract-page-toolbar">
         <div>
-          <div className="contract-eyebrow">合同专项审查配置</div>
-          <h2>确认合同审查配置</h2>
-          <p>开始后直接创建条款级合同审查任务并进入审查工作台，不经过文件分类任务池。</p>
+          <div className="contract-eyebrow">合同专项审查</div>
+          <h2>上传待审查合同</h2>
+          <p>上传 1 份合同和 1–20 份制度依据，系统将按制度要求自动审查合同条款。</p>
         </div>
-        <button
-          type="button"
-          className="secondary"
-          onClick={() => setPendingFile(null)}
-          disabled={submitting}
-        >
-          重新选择文件
+        <button type="button" className="secondary" onClick={() => void router.push(routes.contractReviewTasks)}>
+          查看合同任务池 <ArrowRight size={14} />
         </button>
       </PageToolbar>
+
       <Surface className="contract-confirm-card">
         <div className="contract-confirm-grid">
           <section className="contract-file-panel">
             <div className="contract-section-heading">
-              <div>
-                <span className="contract-section-kicker">01 · 文件</span>
-                <h3>合同文件</h3>
-              </div>
-              <Status tone="success">已读取</Status>
+              <div><span className="contract-section-kicker">01 · 合同</span><h3>待审查合同</h3></div>
+              {contractFile ? <Status tone="success">已选择</Status> : <Status tone="neutral">必选 1 份</Status>}
             </div>
-            <div className="contract-file-row">
-              <span className="contract-file-icon"><FileText size={20} /></span>
-              <label>
-                <span>文件名称</span>
-                <input value={name} onChange={(event) => setName(event.target.value)} />
-              </label>
-              <span className="contract-file-size">{formatFileSize(pendingFile.size)}</span>
+            <input ref={contractInputRef} className="visually-hidden" type="file" accept=".docx,.pdf" onChange={handleContractInput} />
+            {contractFile ? (
+              <div className="contract-file-row">
+                <span className="contract-file-icon"><FileText size={20} /></span>
+                <span><strong>{contractFile.name}</strong><small>{formatFileSize(contractFile.size)}</small></span>
+                <button type="button" className="icon-button contract-remove-file" aria-label="移除合同文件" onClick={() => setContractFile(null)} disabled={submitting}><X size={16} /></button>
+              </div>
+            ) : (
               <button
                 type="button"
-                className="icon-button contract-remove-file"
-                aria-label="移除合同文件"
-                onClick={() => setPendingFile(null)}
-                disabled={submitting}
+                className={`contract-dropzone${isDragging ? " dragging" : ""}`}
+                onClick={() => contractInputRef.current?.click()}
+                onDragEnter={() => setIsDragging(true)}
+                onDragOver={(event) => event.preventDefault()}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={handleContractDrop}
               >
-                <X size={16} />
+                <span className="contract-dropzone-icon"><UploadCloud size={28} /></span>
+                <strong>拖入合同，或点击选择文件</strong>
+                <small>支持 .docx、.pdf</small>
               </button>
-            </div>
-            <div className="contract-confirm-hint">
-              <Check size={15} /> 文件信息已读取，请核对名称和审查配置后创建任务。
-            </div>
+            )}
           </section>
 
           <aside className="contract-config-panel">
             <div className="contract-section-heading">
-              <div>
-                <span className="contract-section-kicker">02 · 审查配置</span>
-                <h3>选择审查方式</h3>
-              </div>
+              <div><span className="contract-section-kicker">02 · 审查依据</span><h3>制度文件</h3></div>
+              <Status tone={policyFiles.length > 0 ? "success" : "neutral"}>{policyFiles.length}/20</Status>
             </div>
-            <label className="contract-field-label">
-              <span>审查偏向</span>
-              <select value={stance} onChange={(event) => setStance(event.target.value as ContractReviewStance)}>
-                {Object.entries(contractReviewStanceLabels).map(([value, label]) => (
-                  <option value={value} key={value}>{label}</option>
-                ))}
-              </select>
-            </label>
-            <fieldset className="contract-module-fieldset">
-              <legend>合同审查模块</legend>
-              <p>至少选择一个模块，系统将只按选中的范围生成风险报告。</p>
-              <div className="contract-module-options">
-                {contractReviewModuleDefinitions.map((module) => (
-                  <label key={module.id} className="contract-module-option">
-                    <input
-                      type="checkbox"
-                      checked={modules.includes(module.id)}
-                      onChange={() => toggleModule(module.id)}
-                    />
-                    <span>{module.label}</span>
-                  </label>
-                ))}
-              </div>
-            </fieldset>
+            <input ref={policyInputRef} className="visually-hidden" type="file" accept=".docx,.pdf" multiple onChange={handlePolicyInput} />
+            <button type="button" className="secondary" onClick={() => policyInputRef.current?.click()} disabled={submitting || policyFiles.length >= 20}>
+              <Plus size={15} /> 添加制度依据
+            </button>
+            <div className="contract-module-options">
+              {policyFiles.length === 0 ? <p>至少添加 1 份制度文件，最多 20 份。</p> : null}
+              {policyFiles.map((file, index) => (
+                <div className="contract-file-row" key={`${file.name}-${file.size}`}>
+                  <span className="contract-file-icon"><FileText size={17} /></span>
+                  <span><strong>{file.name}</strong><small>{formatFileSize(file.size)}</small></span>
+                  <button type="button" className="icon-button contract-remove-file" aria-label={`移除制度文件 ${file.name}`} onClick={() => setPolicyFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))} disabled={submitting}><X size={15} /></button>
+                </div>
+              ))}
+            </div>
           </aside>
         </div>
+
         <div className="contract-confirm-footer">
-          <p>{feedback ?? `已选择 ${modules.length} 个检查模块，开始后直接进入审查工作台。`}</p>
-          <button
-            type="button"
-            className="primary"
-            disabled={submitting || !name.trim() || modules.length === 0}
-            onClick={() => void confirmTask()}
-          >
+          <p>{feedback ?? (contractFile && policyFiles.length > 0 ? <><Check size={15} /> 文件已就绪，可开始自动审查。</> : "请选择合同和制度依据。")}</p>
+          <button type="button" className="primary" disabled={submitting || !contractFile || policyFiles.length < 1} onClick={() => void confirmTask()}>
             {submitting ? <span className="button-spinner" aria-hidden="true" /> : <Plus size={15} />}
-            {submitting ? "正在开始审查" : "开始审查"}
+            {submitting ? "正在创建任务" : "开始审查"}
           </button>
         </div>
       </Surface>

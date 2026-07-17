@@ -72,7 +72,7 @@ import {
 } from "./decoders";
 import { HttpClient, type HttpClientOptions } from "./HttpClient";
 import type { QueryParameters } from "./types";
-import { uploadFileToObjectStorage, uploadFilesToObjectStorage } from "./upload";
+import { uploadFilesToObjectStorage } from "./upload";
 
 function taskQuery(query: TaskPoolQuery): QueryParameters {
   return {
@@ -318,6 +318,13 @@ export class ReviewTaskPoolHttpAdapter implements ReviewTaskPoolApi {
     return result.progress;
   }
 
+  getTask(reviewTaskId: ReviewTaskId, options?: RepositoryRequestOptions) {
+    return this.client.request(
+      `/review-tasks/${encodeURIComponent(reviewTaskId)}/document`,
+      { signal: options?.signal, decode: nullable(decodeDocumentSummary) },
+    );
+  }
+
   getReport(reviewTaskId: ReviewTaskId, options?: RepositoryRequestOptions) {
     return this.client.request(
       `/review-tasks/${encodeURIComponent(reviewTaskId)}/report`,
@@ -503,6 +510,25 @@ export class DocumentRepositoryHttpAdapter implements DocumentRepository {
 export class ContractReviewHttpAdapter implements ContractReviewApi {
   constructor(private readonly client: HttpClient) {}
 
+  uploadDocument(
+    file: File,
+    documentType: "CONTRACT" | "POLICY",
+    options: ContractMutationOptions,
+  ) {
+    const body = new FormData();
+    body.append("file", file);
+    body.append("documentType", documentType);
+    return this.client.request<import("../../features/contracts/application").UploadedContractDocument>(
+      "/business/documents",
+      {
+        method: "POST",
+        body,
+        idempotencyKey: options.idempotencyKey,
+        signal: options.signal,
+      },
+    );
+  }
+
   listTasks(options?: ContractRequestOptions): Promise<readonly ContractReviewTask[]> {
     return this.client.request("/contract-review/tasks", {
       signal: options?.signal,
@@ -535,14 +561,11 @@ export class ContractReviewHttpAdapter implements ContractReviewApi {
     input: CreateContractReviewTaskCommand,
     options: ContractMutationOptions,
   ) {
-    const file = await uploadFileToObjectStorage(this.client, input.file, {
-      idempotencyKey: `${options.idempotencyKey}:file`,
-      signal: options.signal,
-    });
     return this.client.request("/contract-review/tasks", {
       method: "POST",
       body: {
-        fileId: file.id,
+        contractFileId: input.contractFileId,
+        policyFileIds: input.policyFileIds,
         name: input.name,
         stance: input.stance,
         modules: input.modules,

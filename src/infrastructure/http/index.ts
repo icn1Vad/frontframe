@@ -3,6 +3,7 @@ export * from "./decoders";
 export * from "./errors";
 export * from "./factories";
 export * from "./HttpClient";
+export * from "./BusinessContractReviewApi";
 export * from "./polling";
 export * from "./query";
 export * from "./types";

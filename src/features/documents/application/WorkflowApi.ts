@@ -189,6 +189,10 @@ export interface ReviewTaskPoolApi {
     reviewTaskId: ReviewTaskId,
     options?: RepositoryRequestOptions,
   ): Promise<number>;
+  getTask(
+    reviewTaskId: ReviewTaskId,
+    options?: RepositoryRequestOptions,
+  ): Promise<DocumentSummary | null>;
   getReport(
     reviewTaskId: ReviewTaskId,
     options?: RepositoryRequestOptions,

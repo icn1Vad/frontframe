@@ -52,6 +52,7 @@ interface ChatMessage {
 function statusMeta(task: ContractReviewTask) {
   if (task.status === "stored") return { label: "已入库", tone: "success" as const };
   if (task.status === "reported") return { label: "报告已生成", tone: "warning" as const };
+  if (task.status === "failed") return { label: "审查失败", tone: "danger" as const };
   if (task.status === "reviewing") return { label: "智能审查中", tone: "info" as const };
   return { label: "待开始", tone: "neutral" as const };
 }
@@ -92,7 +93,6 @@ export function ContractReviewWorkbenchScreen({
   const [task, setTask] = useState<ContractReviewTask | null>(null);
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState(0);
-  const [reviewComplete, setReviewComplete] = useState(false);
   const [reportGenerated, setReportGenerated] = useState(false);
   const [activeTab, setActiveTab] = useState<WorkbenchTab>("risks");
   const [sourceView, setSourceView] = useState<SourceView>("original");
@@ -109,6 +109,7 @@ export function ContractReviewWorkbenchScreen({
   const [feedback, setFeedback] = useState<string | null>(null);
   const clauseRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const wpsEditorRef = useRef<WpsWebOfficeEditorHandle>(null);
+  const taskStatus = task?.status;
 
   const handleWpsReadyChange = useCallback((ready: boolean) => {
     setWpsReady(ready);
@@ -130,7 +131,6 @@ export function ContractReviewWorkbenchScreen({
       if (result) {
         setTask(result);
         setProgress(result.progress);
-        setReviewComplete(result.status === "reported" || result.status === "stored");
         setReportGenerated(result.status === "reported" || result.status === "stored");
         setSelectedRiskId(result.risks[0]?.id ?? null);
         setMessages([
@@ -142,36 +142,45 @@ export function ContractReviewWorkbenchScreen({
         ]);
       }
       setLoading(false);
-    }).catch(() => {
-      if (active) setLoading(false);
+    }).catch((error: unknown) => {
+      if (active) {
+        setFeedback(error instanceof Error ? error.message : "合同任务加载失败");
+        setLoading(false);
+      }
     });
     return () => { active = false; };
   }, [api, taskId]);
 
   useEffect(() => {
-    if (!task || task.status !== "queued") return;
-    void api.startReview(task.id, {
-      idempotencyKey: createIdempotencyKey("start-contract-review"),
-      expectedVersion: task.version,
-    }).then((updated) => {
-      setTask(updated);
-      setProgress(updated.progress);
-    });
-  }, [api, task]);
-
-  useEffect(() => {
-    if (!task || task.status !== "reviewing") return;
-    setProgress(task.progress);
-    setReviewComplete(task.progress >= 100);
-    const timer = window.setInterval(() => {
-      setProgress((current) => {
-        const next = Math.min(100, current + 20);
-        if (next >= 100) setReviewComplete(true);
-        return next;
-      });
-    }, 450);
-    return () => window.clearInterval(timer);
-  }, [task]);
+    if (taskStatus !== "queued" && taskStatus !== "reviewing") return;
+    let active = true;
+    let timer: number | undefined;
+    const poll = async () => {
+      if (!active || document.visibilityState === "hidden") return;
+      try {
+        const updated = await api.getTask(taskId);
+        if (active && updated) {
+          setTask(updated);
+          setProgress(updated.progress);
+          setReportGenerated(updated.status === "reported" || updated.status === "stored");
+          if (updated.risks.length > 0) setSelectedRiskId((current) => current ?? updated.risks[0].id);
+        }
+      } catch (error) {
+        if (active) setFeedback(error instanceof Error ? `状态刷新失败：${error.message}` : "状态刷新失败");
+      }
+      if (active) timer = window.setTimeout(() => void poll(), 2500);
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") void poll();
+    };
+    timer = window.setTimeout(() => void poll(), 2500);
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      active = false;
+      if (timer !== undefined) window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [api, taskId, taskStatus]);
 
   const selectedRisk = task?.risks.find((risk) => risk.id === selectedRiskId);
   const activeWpsAnchor = useMemo(
@@ -255,32 +264,15 @@ export function ContractReviewWorkbenchScreen({
       if (state === "resolved" && !usingWps) setSourceView("revision");
       setFeedback(
         state === "resolved"
-          ? usingWps ? "修订已写入在线文档并触发保存" : "修订已应用到文档预览"
+          ? usingWps ? "修订已写入在线文档并触发保存；风险处理状态仅保存在本浏览器" : "修订已应用到文档预览；风险处理状态仅保存在本浏览器"
           : state === "ignored"
-            ? "风险已记录为人工忽略"
-            : usingWps ? "在线文档修订已撤回并保存" : "风险状态已恢复",
+            ? "风险已在本浏览器记录为人工忽略，Java 暂无风险写回接口"
+            : usingWps ? "在线文档修订已撤回并保存；风险状态仅保存在本浏览器" : "风险状态已在本浏览器恢复",
       );
     } catch (error) {
       setFeedback(error instanceof Error ? error.message : "风险状态更新失败");
     } finally {
       setBusyRiskId(null);
-    }
-  };
-
-  const generateReport = async () => {
-    if (!task || !reviewComplete || reportGenerated) return;
-    setFeedback(null);
-    try {
-      const updated = await api.generateReport(task.id, {
-        idempotencyKey: createIdempotencyKey("generate-contract-report"),
-        expectedVersion: task.version,
-      });
-      setTask(updated);
-      setReportGenerated(true);
-      setProgress(100);
-      setFeedback("审查报告已生成，可以开始人工处理风险");
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : "报告生成失败");
     }
   };
 
@@ -292,7 +284,7 @@ export function ContractReviewWorkbenchScreen({
         expectedVersion: task.version,
       });
       setTask(updated);
-      setFeedback("合同审查记录已入库");
+      setFeedback("已在本浏览器标记处理完成；Java 当前未提供合同结果入库接口");
     } catch (error) {
       setFeedback(error instanceof Error ? error.message : "入库失败");
     }
@@ -343,7 +335,7 @@ export function ContractReviewWorkbenchScreen({
           <Link href={routes.contractReviewTasks} className="contract-back-link"><ArrowLeft size={14} /> 返回任务池</Link>
           <div className="contract-eyebrow">合同专项审查工作台</div>
           <div className="contract-title-line"><FileText size={21} /><h2>{task.name}</h2><Status tone={status.tone}>{status.label}</Status></div>
-          <p>{contractReviewStanceLabels[task.stance]} · 已选择 {task.modules.length} 个审查模块</p>
+          <p>{task.policies?.length ?? 0} 份制度依据 · {task.currentStage ?? "等待状态更新"}</p>
         </div>
         <div className="contract-workbench-actions">
           {reportGenerated ? (
@@ -351,8 +343,8 @@ export function ContractReviewWorkbenchScreen({
               <CheckCircle2 size={15} /> {task.status === "stored" ? "已入库" : "确认并入库"}
             </button>
           ) : (
-            <button type="button" className="primary" disabled={!reviewComplete} onClick={() => void generateReport()}>
-              <Sparkles size={15} /> {reviewComplete ? "生成审查报告" : "审查进行中"}
+            <button type="button" className="primary" disabled>
+              <Sparkles size={15} /> {task.status === "failed" ? "审查失败" : "Java 自动审查中"}
             </button>
           )}
         </div>
@@ -360,7 +352,7 @@ export function ContractReviewWorkbenchScreen({
 
       {!reportGenerated ? (
         <section className="contract-progress-panel">
-          <div className="contract-progress-heading"><div><span>智能合同审查</span><strong>{progress}%</strong></div><Status tone="info">正在对照文本分析</Status></div>
+          <div className="contract-progress-heading"><div><span>智能合同审查</span><strong>{progress}%</strong></div><Status tone={task.status === "failed" ? "danger" : "info"}>{task.error?.message ?? task.currentStage ?? "正在对照文本分析"}</Status></div>
           <div className="contract-progress-track"><i style={{ width: `${progress}%` }} /></div>
           <div className="contract-progress-steps"><span className={progress >= 25 ? "done" : "active"}>读取合同结构</span><ChevronRight size={14} /><span className={progress >= 55 ? "done" : progress >= 25 ? "active" : ""}>执行模块检查</span><ChevronRight size={14} /><span className={progress >= 85 ? "done" : progress >= 55 ? "active" : ""}>生成风险证据</span><ChevronRight size={14} /><span className={progress >= 100 ? "done" : ""}>等待生成报告</span></div>
         </section>
@@ -508,8 +500,8 @@ export function ContractReviewWorkbenchScreen({
         </aside>
       </section>
       <div className="contract-workbench-footer">
-        <span>{feedback ?? (task.status === "stored" ? "本合同审查记录已完成入库。" : reportGenerated ? (canStore ? "全部风险已处理，可以入库。" : `还有 ${openRisks.length} 项风险待人工确认。`) : "报告生成后，风险项目和解析结果会在右侧展开。")}</span>
-        {reportGenerated && !canStore && task.status !== "stored" ? <span className="contract-footer-hint"><ShieldAlert size={13} /> 应用修改和人工忽略都会写入审计记录</span> : null}
+        <span>{feedback ?? (task.status === "failed" ? `${task.error?.message ?? "合同审查失败"}${task.error?.retryable ? "，后端标记为可重试" : ""}` : task.status === "stored" ? "本浏览器已标记处理完成，尚未写回 Java。" : reportGenerated ? (canStore ? "全部风险已处理；风险状态目前只保存在本浏览器。" : `还有 ${openRisks.length} 项风险待人工确认；处理状态目前只保存在本浏览器。`) : "Java 完成任务后，风险项目和解析结果会在右侧展开。")}</span>
+        {reportGenerated && !canStore && task.status !== "stored" ? <span className="contract-footer-hint"><ShieldAlert size={13} /> WPS 文档保存沿用原能力；风险状态暂不写回 Java</span> : null}
       </div>
       {ignoreRiskId && task ? (
         <Modal

@@ -557,6 +557,10 @@ export class MockReviewTaskPoolApi implements ReviewTaskPoolApi {
     return document?.state.kind === "reviewing" ? document.state.progress : 100;
   }
 
+  getTask(reviewTaskId: ReviewTaskId, options?: RepositoryRequestOptions) {
+    return this.documents.getByReviewTaskId(reviewTaskId, options);
+  }
+
   async getReport(reviewTaskId: ReviewTaskId, options?: RepositoryRequestOptions) {
     throwIfAborted(options);
     const cached = this.readReport(reviewTaskId);

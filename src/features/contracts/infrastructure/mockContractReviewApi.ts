@@ -188,6 +188,16 @@ function updateTask(
 }
 
 export const mockContractReviewApi: ContractReviewApi = {
+  async uploadDocument(file, documentType, options) {
+    options.signal?.throwIfAborted();
+    return {
+      fileId: `mock-${documentType.toLowerCase()}-${Date.now()}`,
+      fileName: file.name,
+      size: file.size,
+      contentType: file.type || "application/octet-stream",
+      documentType,
+    };
+  },
   async listTasks(options) {
     options?.signal?.throwIfAborted();
     return clone(

@@ -28,12 +28,43 @@ const ReviewTasks: AppPage<ReviewTasksProps> = function ReviewTasks({ result }) 
   const router = useRouter();
   const [rows, setRows] = useState(result.items);
   const [pageCount, setPageCount] = useState(result.pageCount);
+  const [feedback, setFeedback] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let latestRows = result.items;
     setRows(result.items);
-    const load = async () => {
+    const pollActiveTasks = async (items: readonly DocumentSummary[]) => {
+      if (!active || document.hidden) return;
+      const activeTaskIds = items.flatMap((item) =>
+        item.state.kind === "reviewing" && item.state.reviewStatus !== "FAILED"
+          ? [item.state.reviewTaskId]
+          : [],
+      );
+      if (activeTaskIds.length === 0) return;
+      try {
+        const refreshed = await Promise.all(
+          activeTaskIds.map((taskId) => appServices.reviewTasks.getTask(taskId)),
+        );
+        if (!active) return;
+        const refreshedById = new Map(
+          refreshed.filter((item): item is DocumentSummary => item !== null).map((item) => [item.id, item]),
+        );
+        latestRows = items.map((item) => refreshedById.get(item.id) ?? item);
+        setRows(latestRows);
+        setFeedback(null);
+        if (latestRows.some((item) => item.state.kind === "reviewing" && item.state.reviewStatus !== "FAILED")) {
+          timer = setTimeout(() => void pollActiveTasks(latestRows), 2500);
+        }
+      } catch (error) {
+        if (active) {
+          setFeedback(error instanceof Error ? `任务状态刷新失败：${error.message}` : "任务状态刷新失败");
+          timer = setTimeout(() => void pollActiveTasks(latestRows), 2500);
+        }
+      }
+    };
+    const loadList = async () => {
       if (!active || document.hidden) return;
       try {
         const clientResult = await appServices.reviewTasks.list({
@@ -42,22 +73,21 @@ const ReviewTasks: AppPage<ReviewTasksProps> = function ReviewTasks({ result }) 
           sort: { by: "updatedAt", direction: "desc" },
         });
         if (!active) return;
-        setRows(clientResult.items);
+        latestRows = clientResult.items;
+        setRows(latestRows);
         setPageCount(clientResult.pageCount);
-        const hasActiveTask = clientResult.items.some(
-          (item) => item.state.kind === "reviewing" && item.state.reviewStatus !== "FAILED",
-        );
-        if (hasActiveTask) timer = setTimeout(() => void load(), 2500);
-      } catch {
-        if (active) setRows([]);
+        setFeedback(null);
+        await pollActiveTasks(latestRows);
+      } catch (error) {
+        if (active) setFeedback(error instanceof Error ? `任务池加载失败：${error.message}` : "任务池加载失败");
       }
     };
     const handleVisibility = () => {
-      if (!document.hidden) void load();
+      if (!document.hidden) void loadList();
       else if (timer) clearTimeout(timer);
     };
     document.addEventListener("visibilitychange", handleVisibility);
-    void load();
+    void loadList();
     return () => {
       active = false;
       if (timer) clearTimeout(timer);
@@ -80,6 +110,7 @@ const ReviewTasks: AppPage<ReviewTasksProps> = function ReviewTasks({ result }) 
           },
         }}
       />
+      {feedback ? <p className="action-feedback error" role="status">{feedback}</p> : null}
     </PageStack>
   );
 };

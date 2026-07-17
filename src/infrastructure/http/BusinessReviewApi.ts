@@ -172,21 +172,25 @@ export class BusinessReviewApi implements ReviewTaskPoolApi {
     };
   }
 
-  private getTask(taskId: ReviewTaskId, signal?: AbortSignal): Promise<ReviewTaskDto> {
+  private getTaskDto(taskId: ReviewTaskId, signal?: AbortSignal): Promise<ReviewTaskDto> {
     return this.client.request<ReviewTaskDto>(`/business/review/tasks/${encodeURIComponent(taskId)}`, {
       signal,
     });
   }
 
   async getProgress(taskId: ReviewTaskId, options?: RepositoryRequestOptions) {
-    return (await this.getTask(taskId, options?.signal)).progress;
+    return (await this.getTaskDto(taskId, options?.signal)).progress;
+  }
+
+  async getTask(taskId: ReviewTaskId, options?: RepositoryRequestOptions) {
+    return reviewTaskToDocument(await this.getTaskDto(taskId, options?.signal));
   }
 
   async getReport(
     taskId: ReviewTaskId,
     options?: RepositoryRequestOptions,
   ): Promise<ReviewReport | null> {
-    const task = await this.getTask(taskId, options?.signal);
+    const task = await this.getTaskDto(taskId, options?.signal);
     if (task.status !== "SUCCEEDED") return null;
     const result = await this.client.request<ReviewResultDto>(
       `/business/review/tasks/${encodeURIComponent(taskId)}/result`,

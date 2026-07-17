@@ -1,4 +1,4 @@
-import { BookOpen, Plus, Send, Trash2 } from "lucide-react";
+import { BookOpen, Plus, RotateCcw, Send, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import type {
   ChatApi,
@@ -7,9 +7,16 @@ import type {
 } from "../../app/services";
 import { createIdempotencyKey } from "../../shared/lib/idempotency";
 import { IconButton, Status } from "../../shared/ui";
+import { ChatStreamError } from "./ChatStreamError";
 
 export interface ChatScreenProps {
   readonly api: ChatApi;
+}
+
+interface RetryRequest {
+  readonly conversationId: string;
+  readonly question: string;
+  readonly idempotencyKey: string;
 }
 
 export function ChatScreen({ api }: ChatScreenProps) {
@@ -25,6 +32,7 @@ export function ChatScreen({ api }: ChatScreenProps) {
   const [streamedContent, setStreamedContent] = useState("");
   const [streamedCitations, setStreamedCitations] = useState<readonly ChatCitation[]>([]);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [retryRequest, setRetryRequest] = useState<RetryRequest | null>(null);
 
   const loadConversations = useCallback(async (preferredId?: string) => {
     const items = await api.listConversations();
@@ -67,6 +75,7 @@ export function ChatScreen({ api }: ChatScreenProps) {
     setActiveId(id);
     setActiveConversation((await api.getConversation(id)) ?? null);
     setFeedback(null);
+    setRetryRequest(null);
   };
 
   const createConversation = async () => {
@@ -111,34 +120,48 @@ export function ChatScreen({ api }: ChatScreenProps) {
     }
   };
 
-  const submitQuestion = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!activeId || !question.trim() || sending) return;
-    const currentQuestion = question.trim();
-    setQuestion("");
+  const sendQuestion = async (request: RetryRequest) => {
+    if (sending) return;
     setSending(true);
-    setPendingQuestion(currentQuestion);
+    setPendingQuestion(request.question);
     setStreamedContent("");
     setStreamedCitations([]);
     setFeedback(null);
     try {
-      await api.sendMessage(activeId, currentQuestion, {
-        idempotencyKey: createIdempotencyKey("send-chat-message"),
+      await api.sendMessage(request.conversationId, request.question, {
+        idempotencyKey: request.idempotencyKey,
         onDelta: (content) => setStreamedContent((current) => current + content),
         onCitation: (citation) => {
           setStreamedCitations((current) => [...current, citation]);
         },
       });
-      await loadConversations(activeId);
+      setRetryRequest(null);
+      setQuestion("");
+      await loadConversations(request.conversationId);
     } catch (error) {
       setFeedback(error instanceof Error ? error.message : "发送失败，请稍后重试");
-      setQuestion(currentQuestion);
+      setQuestion(request.question);
+      setRetryRequest(error instanceof ChatStreamError && error.retryable ? request : null);
     } finally {
       setSending(false);
       setPendingQuestion(null);
       setStreamedContent("");
       setStreamedCitations([]);
     }
+  };
+
+  const submitQuestion = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const currentQuestion = question.trim();
+    if (!activeId || !currentQuestion || currentQuestion.length > 4000 || sending) return;
+    const request = {
+      conversationId: activeId,
+      question: currentQuestion,
+      idempotencyKey: createIdempotencyKey("send-chat-message"),
+    };
+    setQuestion("");
+    setRetryRequest(null);
+    void sendQuestion(request);
   };
 
   return (
@@ -274,7 +297,7 @@ export function ChatScreen({ api }: ChatScreenProps) {
                             <span className="chat-source-meta">正式入库来源</span>
                             <strong>{citation.documentName}</strong>
                             {citation.location ? <small>{citation.location}</small> : null}
-                            <small>{citation.excerpt}</small>
+                            {citation.excerpt ? <small>{citation.excerpt}</small> : null}
                           </div>
                         </article>
                       ))}
@@ -311,7 +334,7 @@ export function ChatScreen({ api }: ChatScreenProps) {
                               <span className="chat-source-meta">正式入库来源</span>
                               <strong>{citation.documentName}</strong>
                               {citation.location ? <small>{citation.location}</small> : null}
-                              <small>{citation.excerpt}</small>
+                              {citation.excerpt ? <small>{citation.excerpt}</small> : null}
                             </div>
                           </article>
                         ))}
@@ -329,6 +352,7 @@ export function ChatScreen({ api }: ChatScreenProps) {
             <input
               aria-label="问题"
               value={question}
+              maxLength={4000}
               disabled={!activeId || sending}
               placeholder="继续追问，或要求对比具体条款……"
               onChange={(event) => setQuestion(event.target.value)}
@@ -341,12 +365,17 @@ export function ChatScreen({ api }: ChatScreenProps) {
               {sending ? <span className="button-spinner" /> : <Send />}
             </IconButton>
           </form>
-          <small>回答仅供参考，关键制度结论请结合引用原文复核。</small>
+          <small>{question.length}/4000 · 回答仅供参考，关键制度结论请结合引用原文复核。</small>
           <div className="action-feedback-slot" role="status" aria-live="polite">
             {feedback ? (
               <span className={feedback.includes("失败") ? "error" : undefined}>
                 {feedback}
               </span>
+            ) : null}
+            {retryRequest ? (
+              <button type="button" className="secondary" disabled={sending} onClick={() => void sendQuestion(retryRequest)}>
+                <RotateCcw size={14} /> 使用原请求重试
+              </button>
             ) : null}
           </div>
         </footer>

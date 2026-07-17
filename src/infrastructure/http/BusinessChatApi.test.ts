@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BusinessChatApi } from "./BusinessChatApi";
+import { ChatStreamError } from "../../features/chat/ChatStreamError";
 import type { HttpClient } from "./HttpClient";
 
 afterEach(() => vi.unstubAllGlobals());
@@ -10,7 +11,7 @@ describe("BusinessChatApi SSE", () => {
       "event: meta\r\ndata: {\"requestId\":\"r1\",\"conversationId\":\"c1\",\"messageId\":\"m1\"}\r\n\r\n",
       "event: delta\r\ndata: {\"content\":\"采购事项\"}\r\n\r\n",
       "event: delta\r\ndata: {\"content\":\"需要审批。\"}\r\n\r\n",
-      "event: citation\r\ndata: {\"citation\":{\"sourceId\":\"p1\",\"sourceName\":\"采购制度\",\"location\":\"第三条\",\"excerpt\":\"应履行审批\"}}\r\n\r\n",
+      "event: citation\r\ndata: {\"citation\":{\"sourceId\":\"p1\",\"sourceName\":\"采购制度\",\"location\":\"第三条\",\"excerpt\":null}}\r\n\r\n",
       "event: done\r\ndata: {\"messageId\":\"m1\"}\r\n\r\n",
     ];
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(body.join(""), {
@@ -34,7 +35,7 @@ describe("BusinessChatApi SSE", () => {
       documentId: "p1",
       documentName: "采购制度",
       location: "第三条",
-      excerpt: "应履行审批",
+      excerpt: null,
     }]);
     expect(deltas).toEqual(["采购事项", "需要审批。"]);
   });
@@ -46,7 +47,65 @@ describe("BusinessChatApi SSE", () => {
     )));
     const api = new BusinessChatApi(() => "token", vi.fn(), {} as HttpClient);
 
-    await expect(api.sendMessage("c1", "问题", { idempotencyKey: "idem-2" }))
-      .rejects.toThrow("检索失败（可重试）");
+    const error = await api.sendMessage("c1", "问题", { idempotencyKey: "idem-2" })
+      .catch((reason: unknown) => reason);
+    expect(error).toBeInstanceOf(ChatStreamError);
+    expect(error).toMatchObject({ message: "检索失败", retryable: true, errorCode: "CHAT_FAILED" });
+  });
+
+  it("收到 done 后立即结束，不等待服务端关闭连接", async () => {
+    const encoder = new TextEncoder();
+    let cancelled = false;
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode(
+          "event: delta\ndata: {\"content\":\"完成\"}\n\nevent: done\ndata: {\"messageId\":\"m-done\"}\n\n",
+        ));
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(stream, {
+      status: 200,
+      headers: { "content-type": "text/event-stream" },
+    })));
+    const api = new BusinessChatApi(() => "token", vi.fn(), {} as HttpClient);
+
+    const message = await api.sendMessage("c1", "问题", { idempotencyKey: "idem-done" });
+
+    expect(message).toMatchObject({ id: "m-done", content: "完成" });
+    expect(cancelled).toBe(true);
+  });
+
+  it("连接在 done 前中断时标记为可用原幂等键重试", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(
+      "event: delta\ndata: {\"content\":\"未完成\"}\n\n",
+      { status: 200, headers: { "content-type": "text/event-stream" } },
+    )));
+    const api = new BusinessChatApi(() => "token", vi.fn(), {} as HttpClient);
+
+    const error = await api.sendMessage("c1", "问题", { idempotencyKey: "idem-interrupted" })
+      .catch((reason: unknown) => reason);
+
+    expect(error).toBeInstanceOf(ChatStreamError);
+    expect(error).toMatchObject({ retryable: true, errorCode: "CHAT_STREAM_INTERRUPTED" });
+  });
+
+  it("读取会话时只调用列表和消息接口，不请求未约定的详情接口", async () => {
+    const request = vi.fn()
+      .mockResolvedValueOnce({
+        list: [{ conversationId: "c1", title: "测试", createdAt: "2026-07-18", updatedAt: "2026-07-18" }],
+        total: 1,
+      })
+      .mockResolvedValueOnce([]);
+    const api = new BusinessChatApi(() => "token", vi.fn(), { request } as unknown as HttpClient);
+
+    await api.getConversation("c1");
+
+    expect(request.mock.calls.map(([path]) => path)).toEqual([
+      "/business/chat/conversations",
+      "/business/chat/conversations/c1/messages",
+    ]);
   });
 });
