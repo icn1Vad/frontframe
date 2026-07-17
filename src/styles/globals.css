@@ -1554,6 +1554,10 @@ button:disabled { cursor: not-allowed; }
 .contract-not-found svg { color: var(--primary); }
 .contract-not-found h2 { font-size: 18px; }
 .contract-loading-panel p { color: var(--muted); font-size: 12px; }
+.contract-wps-phase-note { min-height: 88px; display: flex; align-items: center; }
+.contract-wps-phase-note > div { display: flex; flex-direction: column; gap: 6px; }
+.contract-wps-phase-note strong { color: var(--text); font-size: 14px; }
+.contract-wps-phase-note span { color: var(--muted); font-size: 11px; line-height: 1.6; }
 
 @media (max-width: 1180px) {
   .contract-workbench { grid-template-columns: minmax(0, 1fr); }

@@ -14,6 +14,8 @@ type TaskFilter = "all" | ContractReviewTaskStatus;
 
 function taskStatusMeta(status: ContractReviewTaskStatus) {
   switch (status) {
+    case "preview":
+      return { label: "可预览编辑", tone: "info" as const };
     case "queued":
       return { label: "待开始", tone: "neutral" as const };
     case "reviewing":
@@ -98,6 +100,7 @@ export function ContractReviewTasksScreen({ api }: ContractReviewTasksScreenProp
   );
   const counts = useMemo(() => ({
     total: tasks.length,
+    preview: tasks.filter((task) => task.status === "preview").length,
     queued: tasks.filter((task) => task.status === "queued").length,
     reviewing: tasks.filter((task) => task.status === "reviewing").length,
     reported: tasks.filter((task) => task.status === "reported").length,
@@ -144,12 +147,13 @@ export function ContractReviewTasksScreen({ api }: ContractReviewTasksScreenProp
         <div className="contract-task-toolbar">
           <div>
             <h3>全部合同任务</h3>
-            <p>系统自动执行任务；进行中任务按 taskId 轮询，页面不可见时暂停。</p>
+            <p>系统自动执行任务；进行中任务按 taskId 轮询，进入工作台后可使用已配置的 WPS 在线编辑。</p>
           </div>
           <label className="contract-filter-label">
             <span>任务状态</span>
             <select value={filter} onChange={(event) => setFilter(event.target.value as TaskFilter)}>
               <option value="all">全部状态</option>
+              <option value="preview">可预览编辑</option>
               <option value="queued">待开始</option>
               <option value="reviewing">审查中</option>
               <option value="reported">报告已生成</option>

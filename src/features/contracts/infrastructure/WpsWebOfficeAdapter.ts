@@ -20,6 +20,7 @@ interface WpsDocument {
   Find: WpsFind;
   TrackRevisions?: boolean;
   Range(start: number, end: number): WpsRange | Promise<WpsRange>;
+  SetReadOnly?(options: { readonly Value: boolean }): Promise<unknown>;
 }
 
 interface WpsApplication {
@@ -37,6 +38,8 @@ interface WpsWebOfficeSdk {
   readonly OfficeType: { readonly Writer: string };
   init(options: Readonly<Record<string, unknown>>): WpsWebOfficeInstance;
 }
+
+export type WpsSdkLoader = (url: string) => Promise<WpsWebOfficeSdk>;
 
 declare global {
   interface Window {
@@ -97,31 +100,43 @@ export class WpsWebOfficeAdapter {
   private instance: WpsWebOfficeInstance | null = null;
   private application: WpsApplication | null = null;
 
+  constructor(private readonly sdkLoader: WpsSdkLoader = loadWpsWebOfficeSdk) {}
+
   async mount(
     container: HTMLElement,
     session: WpsContractEditorSession,
   ): Promise<void> {
-    const sdk = await loadWpsWebOfficeSdk(session.sdkUrl);
+    const sdk = await this.sdkLoader(session.sdkUrl);
     const refreshToken = session.refreshTokenUrl
       ? () => refreshWpsToken(session.refreshTokenUrl!)
       : undefined;
+    const endpoint = session.endpoint?.trim();
+    const initialToken = typeof session.token === "string"
+      ? session.token
+      : session.token?.token;
     const instance = sdk.init({
       officeType: sdk.OfficeType.Writer,
       appId: session.appId,
       fileId: session.fileId,
       mount: container,
-      token: session.token,
+      ...(initialToken ? { token: initialToken } : {}),
       refreshToken,
-      endpoint: session.endpoint,
-      customArgs: session.customArgs,
-      mode: session.mode ?? "normal",
+      ...(endpoint && /^https?:\/\//i.test(endpoint) ? { endpoint } : {}),
+      customArgs: {
+        ...session.customArgs,
+        ...(session.taskId ? { taskId: session.taskId } : {}),
+        ...(session.documentVersionId
+          ? { documentVersionId: session.documentVersionId }
+          : {}),
+      },
+      mode: session.mode === "simple" ? "simple" : "nomal",
       isListenResize: true,
       commonOptions: {
         isShowHeader: false,
         isBrowserViewFullscreen: false,
         isIframeViewFullscreen: false,
       },
-      wordOptions: {
+      wpsOptions: {
         isShowDocMap: false,
         isBestScale: true,
         isShowBottomStatusBar: true,
@@ -130,6 +145,9 @@ export class WpsWebOfficeAdapter {
     await instance.ready();
     this.instance = instance;
     this.application = instance.Application;
+    if (session.readonly && this.application.ActiveDocument.SetReadOnly) {
+      await this.application.ActiveDocument.SetReadOnly({ Value: true });
+    }
   }
 
   async locate(anchor: ContractDocumentAnchor): Promise<void> {

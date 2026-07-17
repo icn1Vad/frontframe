@@ -118,6 +118,7 @@ export function ContractReviewUploadScreen({ api }: ContractReviewUploadScreenPr
           <div className="contract-eyebrow">合同专项审查</div>
           <h2>上传待审查合同</h2>
           <p>上传 1 份合同和 1–20 份制度依据，系统将按制度要求自动审查合同条款。</p>
+          <p>DOCX 可在工作台连接 WPS 在线编辑；PDF 使用文本预览与风险报告。</p>
         </div>
         <button type="button" className="secondary" onClick={() => void router.push(routes.contractReviewTasks)}>
           查看合同任务池 <ArrowRight size={14} />

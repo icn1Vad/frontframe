@@ -1,21 +1,40 @@
 /** @type {import('next').NextConfig} */
 const apiBackendOrigin = process.env.API_BACKEND_ORIGIN?.replace(/\/+$/, "");
+const proofspaceBackendOrigin = process.env.PROOFSPACE_BACKEND_ORIGIN?.replace(/\/+$/, "");
 
 const nextConfig = {
   output: "standalone",
   reactStrictMode: true,
   async rewrites() {
-    if (!apiBackendOrigin) return [];
-    return [
+    const rules = [
       {
-        source: "/api/v1/:path*",
-        destination: `${apiBackendOrigin}/api/v1/:path*`,
+        source: "/v3/3rd/:path*",
+        destination: "/api/wps-demo/:path*",
       },
       {
-        source: "/business/:path*",
-        destination: `${apiBackendOrigin}/business/:path*`,
+        source: "/proofspace/v3/3rd/:path*",
+        destination: "/api/wps-demo/:path*",
       },
     ];
+    if (apiBackendOrigin) {
+      rules.push(
+        {
+          source: "/api/v1/:path*",
+          destination: `${apiBackendOrigin}/api/v1/:path*`,
+        },
+        {
+          source: "/business/:path*",
+          destination: `${apiBackendOrigin}/business/:path*`,
+        },
+      );
+    }
+    if (proofspaceBackendOrigin) {
+      rules.push({
+        source: "/proofspace-api/:path*",
+        destination: `${proofspaceBackendOrigin}/:path*`,
+      });
+    }
+    return rules;
   },
   async redirects() {
     return [

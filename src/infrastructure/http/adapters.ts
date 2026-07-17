@@ -72,7 +72,7 @@ import {
 } from "./decoders";
 import { HttpClient, type HttpClientOptions } from "./HttpClient";
 import type { QueryParameters } from "./types";
-import { uploadFilesToObjectStorage } from "./upload";
+import { uploadFileToObjectStorage, uploadFilesToObjectStorage } from "./upload";
 
 function taskQuery(query: TaskPoolQuery): QueryParameters {
   return {
@@ -561,11 +561,17 @@ export class ContractReviewHttpAdapter implements ContractReviewApi {
     input: CreateContractReviewTaskCommand,
     options: ContractMutationOptions,
   ) {
+    const fileId = input.file
+      ? (await uploadFileToObjectStorage(this.client, input.file, {
+          idempotencyKey: `${options.idempotencyKey}:file`,
+          signal: options.signal,
+        })).id
+      : input.contractFileId;
     return this.client.request("/contract-review/tasks", {
       method: "POST",
       body: {
-        contractFileId: input.contractFileId,
-        policyFileIds: input.policyFileIds,
+        fileId,
+        ...(input.policyFileIds ? { policyFileIds: input.policyFileIds } : {}),
         name: input.name,
         stance: input.stance,
         modules: input.modules,

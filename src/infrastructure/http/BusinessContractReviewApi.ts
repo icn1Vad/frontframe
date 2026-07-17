@@ -255,6 +255,9 @@ export class BusinessContractReviewApi implements ContractReviewApi {
   }
 
   async createTask(input: CreateContractReviewTaskCommand, options: ContractMutationOptions) {
+    if (!("contractFileId" in input) || !input.contractFileId || !input.policyFileIds) {
+      throw new Error("Java 合同审查任务需要合同和制度文件标识");
+    }
     const dto = await this.client.request<ContractTaskDto>("/business/contract-reviews/tasks", {
       method: "POST",
       body: { contractFileId: input.contractFileId, policyFileIds: input.policyFileIds },

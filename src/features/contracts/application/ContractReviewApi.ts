@@ -5,11 +5,18 @@ import type {
   CreateContractReviewTaskInput,
 } from "../domain";
 
-export interface CreateContractReviewTaskCommand
-  extends CreateContractReviewTaskInput {
-  readonly contractFileId: string;
-  readonly policyFileIds: readonly string[];
-}
+export type CreateContractReviewTaskCommand = CreateContractReviewTaskInput & (
+  | {
+      readonly contractFileId: string;
+      readonly policyFileIds: readonly string[];
+      readonly file?: never;
+    }
+  | {
+      readonly file: File;
+      readonly contractFileId?: never;
+      readonly policyFileIds?: never;
+    }
+);
 
 export interface UploadedContractDocument {
   readonly fileId: string;

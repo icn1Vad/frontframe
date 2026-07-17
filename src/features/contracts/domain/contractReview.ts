@@ -20,6 +20,7 @@ export const contractReviewStanceLabels: Record<ContractReviewStance, string> = 
 };
 
 export type ContractReviewTaskStatus =
+  | "preview"
   | "queued"
   | "reviewing"
   | "reported"
