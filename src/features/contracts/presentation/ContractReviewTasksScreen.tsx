@@ -21,7 +21,7 @@ type TaskFilter = "all" | ContractReviewTaskStatus;
 function taskStatusMeta(status: ContractReviewTaskStatus) {
   switch (status) {
     case "preview":
-      return { label: "只读预览", tone: "info" as const };
+      return { label: "待编辑", tone: "info" as const };
     case "queued":
       return { label: "待开始", tone: "neutral" as const };
     case "reviewing":
@@ -121,7 +121,7 @@ export function ContractReviewTasksScreen({ api }: ContractReviewTasksScreenProp
       </PageToolbar>
       <StatGrid className="contract-stats-row">
         <Surface><span>合同任务总数</span><strong>{counts.total}</strong><small>条款级专项审查记录</small></Surface>
-        <Surface><span>只读预览</span><strong>{counts.preview}</strong><small>真实 DOCX 已建立初始版本</small></Surface>
+        <Surface><span>待编辑</span><strong>{counts.preview}</strong><small>DOCX 已建立可编辑工作副本</small></Surface>
         <Surface><span>审查中</span><strong>{counts.reviewing}</strong><small>系统正在生成分析</small></Surface>
         <Surface><span>待处理报告</span><strong>{counts.reported}</strong><small>需要人工确认风险</small></Surface>
       </StatGrid>
@@ -135,7 +135,7 @@ export function ContractReviewTasksScreen({ api }: ContractReviewTasksScreenProp
             <span>任务状态</span>
             <select value={filter} onChange={(event) => setFilter(event.target.value as TaskFilter)}>
               <option value="all">全部状态</option>
-              <option value="preview">只读预览</option>
+              <option value="preview">待编辑</option>
               <option value="queued">待开始</option>
               <option value="reviewing">审查中</option>
               <option value="reported">报告已生成</option>
@@ -179,7 +179,7 @@ export function ContractReviewTasksScreen({ api }: ContractReviewTasksScreenProp
                 <div className="contract-task-actions">
                   <button type="button" className={task.status === "queued" ? "primary" : "secondary"} disabled={busyTaskId === task.id} onClick={() => void openTask(task)}>
                     {busyTaskId === task.id ? <span className="button-spinner" aria-hidden="true" /> : task.status === "queued" ? <Play size={14} /> : <ArrowRight size={14} />}
-                    {task.status === "preview" ? "打开只读合同" : task.status === "queued" ? "开始审查" : task.status === "stored" ? "查看记录" : "进入工作台"}
+                    {task.status === "preview" ? "打开合同" : task.status === "queued" ? "开始审查" : task.status === "stored" ? "查看记录" : "进入工作台"}
                   </button>
                 </div>
               </div>

@@ -127,8 +127,8 @@ export function ContractReviewWorkbenchScreen({
     const editorSession = api.getEditorSession(taskId).catch((error): ContractEditorSession => ({
       provider: "mock",
       reason: error instanceof Error
-        ? `WPS 只读预览当前不可用：${error.message}`
-        : "WPS 只读预览当前不可用，请检查 Java WPS 配置和公网回调",
+        ? `WPS 在线编辑或预览当前不可用：${error.message}`
+        : "WPS 在线编辑或预览当前不可用，请检查 Java WPS 配置和公网回调",
     }));
     void Promise.all([api.getTask(taskId), editorSession]).then(([
       result,

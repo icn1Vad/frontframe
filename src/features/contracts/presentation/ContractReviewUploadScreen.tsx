@@ -151,7 +151,7 @@ export function ContractReviewUploadScreen({
           >
             <span className="contract-dropzone-icon"><UploadCloud size={30} /></span>
             <strong>将合同拖入这里，或点击选择文件</strong>
-            <small>第一阶段支持 DOCX 的 WPS 只读预览，单个文件最大 50 兆字节</small>
+            <small>DOCX 支持 WPS 在线编辑和工作副本保存，单个文件最大 50 兆字节</small>
             <span className="secondary">选择合同文件</span>
           </button>
           <div className="contract-upload-note">
