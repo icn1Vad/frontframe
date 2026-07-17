@@ -53,6 +53,7 @@ import {
 export type CandidateState = ClassificationCandidateState;
 export type ClassificationCandidate = ClassificationCandidateRecord;
 export type CandidateSaveState = "clean" | "dirty" | "saving" | "error";
+type ClassificationView = "entry" | "confirm";
 
 interface UploadFile {
   readonly id: string;
@@ -161,10 +162,12 @@ function formatFileSize(file: File): string {
 
 export function FileClassificationScreen({ api }: FileClassificationScreenProps) {
   const router = useRouter();
+  const entryFileInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const selectAllRef = useRef<HTMLInputElement>(null);
   const initializedFromUrl = useRef(false);
   const [dialog, setDialog] = useState<DialogState>(null);
+  const [view, setView] = useState<ClassificationView>("entry");
   const [files, setFiles] = useState<readonly UploadFile[]>([]);
   const [result, setResult] =
     useState<PageResult<ClassificationCandidateRecord>>(emptyResult);
@@ -438,6 +441,34 @@ export function FileClassificationScreen({ api }: FileClassificationScreenProps)
     }
   };
 
+  const submitFiles = async (
+    browserFiles: readonly File[],
+    options: { readonly closeUploadDialog?: boolean } = {},
+  ) => {
+    if (browserFiles.length === 0) return;
+    setUploading(true);
+    setFeedback(null);
+    try {
+      await api.uploadFiles(browserFiles, {
+        idempotencyKey: idempotencyKey("upload-files"),
+      });
+      setFiles([]);
+      if (options.closeUploadDialog) setDialog(null);
+      setView("confirm");
+      setPage(1);
+      await loadCandidates();
+      setFeedback("文件已提交，正在进行智能分类");
+    } catch (error) {
+      setFeedback(
+        error instanceof Error
+          ? `上传失败：${error.message}`
+          : "上传失败，请稍后重试",
+      );
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const addFiles = (fileList: FileList | readonly File[]) => {
     const additions = Array.from(fileList).map<UploadFile>((file, index) => ({
       id: `upload-${Date.now()}-${index}`,
@@ -456,6 +487,14 @@ export function FileClassificationScreen({ api }: FileClassificationScreenProps)
     event.target.value = "";
   };
 
+  const handleEntryFileInput = (event: ChangeEvent<HTMLInputElement>) => {
+    const browserFiles = event.target.files
+      ? Array.from(event.target.files)
+      : [];
+    event.target.value = "";
+    void submitFiles(browserFiles);
+  };
+
   const handleDragOver = (event: DragEvent<HTMLElement>) => {
     event.preventDefault();
     setIsDragging(true);
@@ -471,26 +510,16 @@ export function FileClassificationScreen({ api }: FileClassificationScreenProps)
     addFiles(event.dataTransfer.files);
   };
 
+  const handleEntryDrop = (event: DragEvent<HTMLElement>) => {
+    event.preventDefault();
+    setIsDragging(false);
+    void submitFiles(Array.from(event.dataTransfer.files));
+  };
+
   const confirmPendingUpload = async () => {
     if (files.length === 0) return;
-    setUploading(true);
-    try {
-      const browserFiles = files.flatMap((item) => (item.file ? [item.file] : []));
-      if (browserFiles.length) {
-        await api.uploadFiles(browserFiles, {
-          idempotencyKey: idempotencyKey("upload-files"),
-        });
-      }
-      setFiles([]);
-      setDialog(null);
-      setPage(1);
-      await loadCandidates();
-      setFeedback("文件已提交，正在进行智能分类");
-    } catch (error) {
-      setFeedback(error instanceof Error ? `上传失败：${error.message}` : "上传失败，请稍后重试");
-    } finally {
-      setUploading(false);
-    }
+    const browserFiles = files.flatMap((item) => (item.file ? [item.file] : []));
+    await submitFiles(browserFiles, { closeUploadDialog: true });
   };
 
   const toggleAll = () => {
@@ -551,6 +580,57 @@ export function FileClassificationScreen({ api }: FileClassificationScreenProps)
       ) : null}
     </div>
   );
+
+  if (view === "entry") {
+    return (
+      <PageStack>
+        <Surface className="upload-panel">
+          <h2>上传待分类文件</h2>
+          <p>系统会生成推荐类型、推荐分类、文件层级和人工确认状态。</p>
+          <input
+            ref={entryFileInputRef}
+            className="visually-hidden"
+            type="file"
+            accept=".pdf,.docx,.xlsx,.txt"
+            multiple
+            disabled={uploading}
+            onChange={handleEntryFileInput}
+          />
+          <button
+            className={`dropzone${isDragging ? " dragging" : ""}`}
+            type="button"
+            disabled={uploading}
+            aria-busy={uploading}
+            onClick={() => entryFileInputRef.current?.click()}
+            onDragEnter={handleDragOver}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleEntryDrop}
+          >
+            <span className="plus-circle">
+              {uploading ? (
+                <span className="button-spinner" aria-hidden="true" />
+              ) : (
+                <Plus />
+              )}
+            </span>
+            <strong>
+              {uploading
+                ? "文件上传中…"
+                : "拖拽文件到这里，或点击选择文件"}
+            </strong>
+            <small>
+              支持便携文档、文字文档、表格文档和纯文本，单个文件最大 50 兆字节
+            </small>
+            <span className="secondary">
+              {uploading ? "正在上传" : "选择文件"}
+            </span>
+          </button>
+        </Surface>
+        {feedbackNode}
+      </PageStack>
+    );
+  }
 
   const classifyingSelected = selectedCandidates.filter(
     (candidate) => candidate.state === "classifying",
