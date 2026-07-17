@@ -537,7 +537,7 @@ export function ContractReviewWorkbenchScreen({
         </aside>
       </ContractReviewSplitPane>
       <div className="contract-workbench-footer">
-        <span>{feedback ?? (task.status === "preview" ? "第一阶段仅验证真实 DOCX 的 WPS 只读打开；审查、编辑和保存尚未开放。" : task.status === "stored" ? "本合同审查记录已完成入库。" : reportGenerated ? (canStore ? "全部风险已处理，可以入库。" : `还有 ${openRisks.length} 项风险待人工确认。`) : "报告生成后，风险项目和解析结果会在右侧展开。")}</span>
+        <span>{feedback ?? (task.status === "preview" ? (editorSession?.provider === "wps" && editorSession.canFinalize ? "当前用户可编辑合同；WPS 自动保存工作副本，点击“保存并生成新版本”后才会生成正式版本。" : "当前合同以只读方式打开；仅上传人或管理员可以编辑并生成新版本。") : task.status === "stored" ? "本合同审查记录已完成入库。" : reportGenerated ? (canStore ? "全部风险已处理，可以入库。" : `还有 ${openRisks.length} 项风险待人工确认。`) : "报告生成后，风险项目和解析结果会在右侧展开。")}</span>
         {reportGenerated && !canStore && task.status !== "stored" ? <span className="contract-footer-hint"><ShieldAlert size={13} /> 应用修改和人工忽略都会写入审计记录</span> : null}
       </div>
       {ignoreRiskId && task ? (
