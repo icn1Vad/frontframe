@@ -359,7 +359,11 @@ export function ContractReviewWorkbenchScreen({
     return <PageStack><div className="contract-not-found"><FileText size={24} /><h2>合同审查任务不存在</h2><Link href={routes.contractReviewTasks} className="secondary">返回合同任务池</Link></div></PageStack>;
   }
 
-  const status = statusMeta(task);
+  const status = task.status === "preview"
+    && editorSession?.provider === "wps"
+    && editorSession.canFinalize
+    ? { label: "可编辑工作副本", tone: "success" as const }
+    : statusMeta(task);
 
   return (
     <PageStack className="contract-workbench-stack">
