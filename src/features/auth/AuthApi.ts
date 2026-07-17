@@ -1,5 +1,5 @@
 export type AuthMode = "login" | "register";
-export type RequestedRole = "user" | "admin";
+export type RequestedRole = "user";
 
 export interface LoginPayload {
   readonly username: string;
@@ -33,7 +33,7 @@ export interface LoginResult {
 }
 
 export interface RegisterResult {
-  readonly status: "submitted" | "unavailable";
+  readonly status: "registered";
   readonly message: string;
 }
 

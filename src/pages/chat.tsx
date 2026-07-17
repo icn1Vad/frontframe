@@ -1,8 +1,12 @@
-import { appServices, definePageConfig, type AppPage } from "../app";
+import {
+  definePageConfig,
+  getRuntimeAppServices,
+  type AppPage,
+} from "../app";
 import { ChatScreen } from "../features/chat";
 
 const Chat: AppPage = function Chat() {
-  return <ChatScreen api={appServices.chat} />;
+  return <ChatScreen api={getRuntimeAppServices().chat} />;
 };
 
 Chat.pageConfig = definePageConfig({ moduleId: "chat" });

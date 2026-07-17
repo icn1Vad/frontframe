@@ -108,6 +108,9 @@ export interface DocumentSummary {
   readonly category: DocumentCategoryCode;
   readonly state: DocumentState;
   readonly operator: UserSummary;
+  readonly capabilities: {
+    readonly canDelete: boolean;
+  };
 }
 
 export function createDocumentId(value: string): DocumentId {
@@ -161,7 +164,7 @@ export function createReviewProgress(value: number): ReviewProgress {
 
 export function createIsoDateTime(value: string): IsoDateTime {
   const isoDateTimePattern =
-    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/;
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:\d{2})$/;
   if (!isoDateTimePattern.test(value) || Number.isNaN(Date.parse(value))) {
     throw new Error(`Invalid ISO date-time: ${value}`);
   }

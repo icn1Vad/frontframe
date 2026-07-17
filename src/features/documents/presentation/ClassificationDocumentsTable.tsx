@@ -16,12 +16,12 @@ export const classificationDocumentColumns = createDocumentColumns({
     const label = document.state.kind === "reviewing"
       ? "已进入审查"
       : document.state.kind === "classified"
-        ? "待处理"
+        ? "待直接入库"
         : document.state.kind === "published"
-          ? "已分类入库"
+          ? "已进入知识库"
           : document.state.kind === "deleted"
             ? "已删除"
-            : "待处理";
+            : "待直接入库";
     return <Status tone={getDocumentStateTone(document.state)}>{label}</Status>;
   },
 });

@@ -28,6 +28,7 @@ function documentWith(state: DocumentState): DocumentSummary {
     category: "administration",
     state,
     operator: { id: createUserId("tester"), displayName: "测试员" },
+    capabilities: { canDelete: true },
   };
 }
 
@@ -42,6 +43,11 @@ function visibleActionIds(
 
 describe("document action matrix", () => {
   it("matches all classification task pool states", () => {
+    expect(
+      classificationDocumentActions
+        .filter((action) => action.type === "command")
+        .map((action) => action.label),
+    ).toEqual(["直接入库", "开始审查"]);
     expect(
       visibleActionIds(
         classificationDocumentActions,

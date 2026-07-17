@@ -30,6 +30,12 @@ describe("document branded values", () => {
     expect(createIsoDateTime("2026-07-05T10:24:00+08:00")).toBe(
       "2026-07-05T10:24:00+08:00",
     );
+    expect(createIsoDateTime("2026-07-05T10:24:00.123456789Z")).toBe(
+      "2026-07-05T10:24:00.123456789Z",
+    );
+    expect(() =>
+      createIsoDateTime("2026-07-05T10:24:00.1234567890Z"),
+    ).toThrow("Invalid ISO date-time");
     expect(() => createIsoDateTime("July 5, 2026 10:24")).toThrow(
       "Invalid ISO date-time",
     );

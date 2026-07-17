@@ -39,7 +39,7 @@ export const classificationDocumentActions = [
     id: "publish",
     type: "command",
     command: "publish",
-    label: "入库",
+    label: "直接入库",
     icon: FolderArchive,
     isVisible: (document) =>
       document.state.kind === "pending" || document.state.kind === "classified",
@@ -48,7 +48,7 @@ export const classificationDocumentActions = [
     id: "start-review",
     type: "command",
     command: "startReview",
-    label: "审查",
+    label: "开始审查",
     icon: ListChecks,
     isVisible: (document) =>
       document.state.kind === "pending" || document.state.kind === "classified",
@@ -61,7 +61,8 @@ export const classificationDocumentActions = [
     icon: Trash2,
     danger: true,
     isVisible: (document) =>
-      document.state.kind === "pending" || document.state.kind === "classified",
+      document.capabilities.canDelete &&
+      (document.state.kind === "pending" || document.state.kind === "classified"),
   },
 ] as const satisfies readonly DocumentActionDefinition[];
 
@@ -103,7 +104,8 @@ export const reviewDocumentActions = [
     icon: Trash2,
     danger: true,
     isVisible: (document) =>
-      document.state.kind === "reviewing" || document.state.kind === "reviewed",
+      document.capabilities.canDelete &&
+      (document.state.kind === "reviewing" || document.state.kind === "reviewed"),
   },
 ] as const satisfies readonly DocumentActionDefinition[];
 
@@ -143,5 +145,6 @@ export const knowledgeDocumentActions = [
     label: "删除",
     icon: Trash2,
     danger: true,
+    isVisible: (document) => document.capabilities.canDelete,
   },
 ] as const satisfies readonly DocumentActionDefinition[];

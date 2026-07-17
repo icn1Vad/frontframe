@@ -6,6 +6,22 @@ info:
   description: |
     ProofSpace 前端与后端的 V1 契约。认证使用 HttpOnly Cookie，
     文件使用对象存储预签名上传，AI 任务状态使用轮询。
+x-proofspace-contract-authority: frontframe-to-java
+x-proofspace-current-demo-scope:
+  implemented:
+    - Auth（普通用户直接注册）
+    - Chat
+    - Uploads
+    - Classification
+    - ClassificationTasks
+    - ContractReview 第一阶段 DOCX 只读预览
+    - Knowledge
+    - Documents 初始版本
+    - ReviewTasks 只读结果链路
+  deferred:
+    - ContractReview 审查、编辑与保存
+    - Documents 后续版本和版本恢复
+    - 报告生成与发布
 servers:
   - url: /api/v1
     description: Same-origin API
@@ -60,6 +76,12 @@ paths:
     post:
       tags: [Auth]
       operationId: register
+      summary: 注册普通用户账号
+      description: |
+        在默认演示租户中直接创建一个普通用户账号，不经过审核，也不自动登录。
+        自助注册不得创建管理员；requestedRole 必须为 user。服务端只保存 bcrypt
+        密码哈希，不得记录或持久化明文密码。
+      x-proofspace-current-status: active
       security: []
       requestBody:
         required: true
@@ -69,13 +91,20 @@ paths:
               $ref: '#/components/schemas/RegisterRequest'
       responses:
         '200':
-          description: 注册申请状态
+          description: 普通用户账号创建成功
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/RegisterEnvelope'
+              example:
+                data:
+                  status: registered
+                  message: 注册成功，请使用新账号登录。
+                traceId: 01J00000000000000000000000
         '400':
           $ref: '#/components/responses/ValidationProblem'
+        '409':
+          $ref: '#/components/responses/ConflictProblem'
         '503':
           $ref: '#/components/responses/ServiceUnavailableProblem'
 
@@ -235,7 +264,7 @@ paths:
               $ref: '#/components/schemas/CreateClassificationCandidatesRequest'
       responses:
         '200':
-          description: 已创建候选并进入 classifying
+          description: 已创建候选并进入 awaiting-confirmation，等待用户确认分类字段
           content:
             application/json:
               schema:
@@ -540,6 +569,7 @@ paths:
     get:
       tags: [ContractReview]
       operationId: listContractReviewTasks
+      x-proofspace-current-status: active-readonly-preview
       responses:
         '200':
           description: 合同专项任务
@@ -550,6 +580,7 @@ paths:
     post:
       tags: [ContractReview]
       operationId: createContractReviewTask
+      x-proofspace-current-status: active-docx-only
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
         - $ref: '#/components/parameters/CsrfToken'
@@ -567,6 +598,7 @@ paths:
     get:
       tags: [ContractReview]
       operationId: getContractReviewTask
+      x-proofspace-current-status: active-readonly-preview
       parameters:
         - $ref: '#/components/parameters/ContractTaskId'
       responses:
@@ -581,6 +613,13 @@ paths:
     get:
       tags: [ContractReview]
       operationId: getContractEditorSession
+      summary: 获取任务绑定文档版本的短期 WPS 会话（兼容入口）
+      description: |
+        会话必须绑定当前用户、合同任务和任务创建时的 documentVersionId，并返回
+        Cache-Control: no-store。若任务已绑定旧版本，不得为新版本签发可写会话。
+        Java 使用任务永久绑定的 documentVersionId 签发只读会话。未配置 WPS 时返回 503，
+        不伪造真实会话，也不把 AppSecret 下发到浏览器。
+      x-proofspace-current-status: active-readonly-preview
       parameters:
         - $ref: '#/components/parameters/ContractTaskId'
       responses:
@@ -590,11 +629,43 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ContractEditorSessionEnvelope'
+        '403':
+          $ref: '#/components/responses/ForbiddenProblem'
+        '404':
+          $ref: '#/components/responses/NotFoundProblem'
+
+  /document-versions/{documentVersionId}/office-sessions:
+    post:
+      tags: [ContractReview]
+      operationId: createDocumentVersionOfficeSession
+      summary: 为确定的文档版本创建短期 WPS 会话
+      description: |
+        长期正式入口。创建会话必须记录安全审计并返回 Cache-Control: no-store。
+        AppSecret 仅从服务端受限 secret 文件读取，不得进入响应、日志或异常信息。
+        此端点只签发会话；WPS 服务端回调由独立回调网关实现，前端不得伪造。
+      x-proofspace-current-status: active-readonly-preview
+      parameters:
+        - $ref: '#/components/parameters/DocumentVersionId'
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '200':
+          description: 短期 WPS 会话
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContractEditorSessionEnvelope'
+        '403':
+          $ref: '#/components/responses/ForbiddenProblem'
+        '404':
+          $ref: '#/components/responses/NotFoundProblem'
+        '409':
+          $ref: '#/components/responses/ConflictProblem'
 
   /contract-review/tasks/{taskId}/start:
     post:
       tags: [ContractReview]
       operationId: startContractReview
+      x-proofspace-current-status: deferred
       parameters:
         - $ref: '#/components/parameters/ContractTaskId'
         - $ref: '#/components/parameters/IfMatch'
@@ -610,6 +681,7 @@ paths:
     post:
       tags: [ContractReview]
       operationId: generateContractReport
+      x-proofspace-current-status: deferred
       parameters:
         - $ref: '#/components/parameters/ContractTaskId'
         - $ref: '#/components/parameters/IfMatch'
@@ -623,6 +695,7 @@ paths:
     patch:
       tags: [ContractReview]
       operationId: updateContractRisk
+      x-proofspace-current-status: deferred
       parameters:
         - $ref: '#/components/parameters/ContractTaskId'
         - $ref: '#/components/parameters/RiskId'
@@ -645,6 +718,7 @@ paths:
     post:
       tags: [ContractReview]
       operationId: storeContractReview
+      x-proofspace-current-status: deferred
       parameters:
         - $ref: '#/components/parameters/ContractTaskId'
         - $ref: '#/components/parameters/IfMatch'
@@ -939,6 +1013,12 @@ components:
       required: true
       schema:
         type: string
+    DocumentVersionId:
+      name: documentVersionId
+      in: path
+      required: true
+      schema:
+        type: string
     RiskId:
       name: riskId
       in: path
@@ -1121,7 +1201,8 @@ components:
           maxLength: 256
         requestedRole:
           type: string
-          enum: [user, admin]
+          const: user
+          description: 自助注册只能创建普通用户
 
     AuthUser:
       type: object
@@ -1171,7 +1252,7 @@ components:
       properties:
         status:
           type: string
-          enum: [submitted, unavailable]
+          const: registered
         message:
           type: string
 
@@ -1446,9 +1527,17 @@ components:
         - $ref: '#/components/schemas/PublishedContractState'
         - $ref: '#/components/schemas/DeletedState'
 
+    DocumentCapabilities:
+      type: object
+      required: [canDelete]
+      properties:
+        canDelete:
+          type: boolean
+          description: 当前登录用户是否可以删除此文档
+
     DocumentSummary:
       type: object
-      required: [id, name, type, level, category, state, operator]
+      required: [id, name, type, level, category, state, operator, capabilities]
       properties:
         id:
           type: string
@@ -1464,6 +1553,8 @@ components:
           $ref: '#/components/schemas/DocumentState'
         operator:
           $ref: '#/components/schemas/UserSummary'
+        capabilities:
+          $ref: '#/components/schemas/DocumentCapabilities'
 
     DocumentPage:
       type: object
@@ -1760,16 +1851,16 @@ components:
 
     ReviewRisk:
       type: object
-      required: [id, category, level, title, summary, evidence, suggestion, state]
+      required: [id, category, level, title, summary, evidence, suggestion, state, source]
       properties:
         id:
           type: string
         category:
           type: string
-          enum: [semantic, conflict, consistency]
+          enum: [semantic, conflict, consistency, executability]
         level:
           type: string
-          enum: [high, medium, low]
+          enum: [critical, high, medium, low]
         title:
           type: string
         summary:
@@ -1781,6 +1872,9 @@ components:
         state:
           type: string
           enum: [open, resolved, ignored]
+        source:
+          type: string
+          enum: [STUB, AI]
         resolution:
           $ref: '#/components/schemas/ReviewRiskResolution'
 
@@ -1918,13 +2012,22 @@ components:
 
     ContractReviewTask:
       type: object
-      required: [id, version, name, size, stance, modules, status, progress, createdAt, clauses, risks]
+      required: [id, version, documentId, documentVersionId, fileType, name, size, stance, modules, status, progress, createdAt, clauses, risks]
       properties:
         id:
           type: string
         version:
           type: integer
           minimum: 1
+        documentId:
+          type: string
+        documentVersionId:
+          type: string
+          description: 审查任务创建时绑定的不可变文档版本
+        fileType:
+          type: string
+          enum: [docx]
+          description: 第一阶段只允许 DOCX 进入 WPS Writer 只读预览
         name:
           type: string
         size:
@@ -1941,7 +2044,7 @@ components:
             enum: [transaction, performance-payment, compliance, data-security, intellectual-property, termination]
         status:
           type: string
-          enum: [queued, reviewing, reported, stored]
+          enum: [preview, queued, reviewing, reported, stored]
         progress:
           type: number
           minimum: 0
@@ -2043,10 +2146,23 @@ components:
         timeout:
           type: integer
           minimum: 1
+          description: Token 有效期，单位毫秒
+
+    WpsEditorUser:
+      type: object
+      required: [id, name, permission]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        permission:
+          type: string
+          enum: [read, write]
 
     WpsEditorSession:
       type: object
-      required: [provider, sdkUrl, appId, fileId]
+      required: [provider, sdkUrl, appId, fileId, contractId, taskId, documentVersionId, officeType, readonly, currentUser, token, expiresAt]
       properties:
         provider:
           const: wps
@@ -2054,12 +2170,30 @@ components:
           type: string
         appId:
           type: string
+          description: WPS AppID，可下发到浏览器；AppSecret 永不下发
         fileId:
           type: string
+        contractId:
+          type: string
+        taskId:
+          type: string
+        documentVersionId:
+          type: string
+        officeType:
+          type: string
+          const: writer
+        readonly:
+          type: boolean
+        currentUser:
+          $ref: '#/components/schemas/WpsEditorUser'
         token:
           oneOf:
             - type: string
             - $ref: '#/components/schemas/WpsToken'
+          description: 与用户、文件和权限绑定的短期 Token；禁止记录到日志
+        expiresAt:
+          type: string
+          format: date-time
         endpoint:
           type: string
         refreshTokenUrl:
@@ -2160,6 +2294,18 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ChatCitation'
+        source:
+          type: string
+          description: assistant 消息必须标记结果来源；user 消息不携带该字段。
+          enum: [STUB, AI]
+      allOf:
+        - if:
+            properties:
+              role:
+                const: assistant
+            required: [role]
+          then:
+            required: [source]
 
     ChatConversation:
       type: object

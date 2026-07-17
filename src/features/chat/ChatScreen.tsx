@@ -214,7 +214,11 @@ export function ChatScreen({ api }: ChatScreenProps) {
                   <div className="message-author">
                     <strong>{message.role === "user" ? "你" : "制度助手"}</strong>
                     {message.role === "assistant" ? (
-                      <Status tone="info">基于知识库</Status>
+                      <Status tone={message.source === "STUB" ? "warning" : "info"}>
+                        {message.source === "STUB"
+                          ? "Stub 演示结果"
+                          : "AI 结果"}
+                      </Status>
                     ) : null}
                   </div>
                   <p>{message.content}</p>

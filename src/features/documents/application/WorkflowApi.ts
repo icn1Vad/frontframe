@@ -12,6 +12,7 @@ import type {
   PageResult,
   RepositoryRequestOptions,
 } from "./DocumentRepository";
+import type { AiResultSource } from "../../../shared/lib/aiResultSource";
 
 export type ClassificationCandidateState =
   | "classifying"
@@ -82,7 +83,7 @@ export interface DocumentPreview {
   readonly content: string;
 }
 
-export type ReviewRiskLevel = "high" | "medium" | "low";
+export type ReviewRiskLevel = "critical" | "high" | "medium" | "low";
 export type ReviewRiskState = "open" | "resolved" | "ignored";
 
 export interface ReviewRiskResolution {
@@ -93,13 +94,14 @@ export interface ReviewRiskResolution {
 
 export interface ReviewRisk {
   readonly id: string;
-  readonly category: "semantic" | "conflict" | "consistency";
+  readonly category: "semantic" | "conflict" | "consistency" | "executability";
   readonly level: ReviewRiskLevel;
   readonly title: string;
   readonly summary: string;
   readonly evidence: string;
   readonly suggestion: string;
   readonly state: ReviewRiskState;
+  readonly source: AiResultSource;
   readonly resolution?: ReviewRiskResolution;
 }
 

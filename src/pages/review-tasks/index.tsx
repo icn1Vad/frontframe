@@ -2,8 +2,11 @@ import type { GetServerSideProps } from "next";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import {
-  appServices,
+  createRequestScopedAppServices,
   definePageConfig,
+  getRuntimeAppServices,
+  isJavaSliceEnabled,
+  redirectToLoginOnUnauthorized,
   routes,
   type AppPage,
 } from "../../app";
@@ -28,12 +31,14 @@ function parsePage(value: string | string[] | undefined): number {
 
 const ReviewTasks: AppPage<ReviewTasksProps> = function ReviewTasks({ result }) {
   const router = useRouter();
+  const services = getRuntimeAppServices();
+  const javaReadOnly = isJavaSliceEnabled();
   const [rows, setRows] = useState(result.items);
 
   useEffect(() => {
     let active = true;
     setRows(result.items);
-    void appServices.reviewTasks.list({
+    void services.reviewTasks.list({
       page: result.page,
       pageSize: result.pageSize,
       sort: { by: "updatedAt", direction: "desc" },
@@ -43,7 +48,7 @@ const ReviewTasks: AppPage<ReviewTasksProps> = function ReviewTasks({ result }) 
     return () => {
       active = false;
     };
-  }, [result]);
+  }, [result, services]);
 
   const replaceRow = (updated: DocumentSummary) => {
     setRows((current) =>
@@ -57,22 +62,30 @@ const ReviewTasks: AppPage<ReviewTasksProps> = function ReviewTasks({ result }) 
     <PageStack>
       <ReviewDocumentsTable
         rows={rows}
-        commands={{
-          publish: async (documentId) => {
-            replaceRow(
-              await appServices.reviewTasks.publish(documentId, {
-                idempotencyKey: createIdempotencyKey("publish-review"),
-              }),
-            );
-          },
-        }}
-        onDelete={async (documentId: DocumentId) => {
-          replaceRow(
-            await appServices.reviewTasks.softDelete(documentId, {
-              idempotencyKey: createIdempotencyKey("delete-review"),
-            }),
-          );
-        }}
+        commands={
+          javaReadOnly
+            ? undefined
+            : {
+                publish: async (documentId) => {
+                  replaceRow(
+                    await services.reviewTasks.publish(documentId, {
+                      idempotencyKey: createIdempotencyKey("publish-review"),
+                    }),
+                  );
+                },
+              }
+        }
+        onDelete={
+          javaReadOnly
+            ? undefined
+            : async (documentId: DocumentId) => {
+                replaceRow(
+                  await services.reviewTasks.softDelete(documentId, {
+                    idempotencyKey: createIdempotencyKey("delete-review"),
+                  }),
+                );
+              }
+        }
         pagination={{
           page: result.page,
           pageCount: result.pageCount,
@@ -92,14 +105,25 @@ ReviewTasks.pageConfig = definePageConfig({ moduleId: "reviewTasks" });
 
 export const getServerSideProps: GetServerSideProps<ReviewTasksProps> = async ({
   query,
-}) => ({
-  props: {
-    result: await appServices.reviewTasks.list({
-      page: parsePage(query.page),
-      pageSize: 25,
-      sort: { by: "updatedAt", direction: "desc" },
-    }),
-  },
-});
+  req,
+}) => {
+  const services = createRequestScopedAppServices({
+    backendOrigin: process.env.API_BACKEND_ORIGIN,
+    cookieHeader: req.headers.cookie,
+  });
+  try {
+    return {
+      props: {
+        result: await services.reviewTasks.list({
+          page: parsePage(query.page),
+          pageSize: 25,
+          sort: { by: "updatedAt", direction: "desc" },
+        }),
+      },
+    };
+  } catch (error: unknown) {
+    return redirectToLoginOnUnauthorized(error);
+  }
+};
 
 export default ReviewTasks;

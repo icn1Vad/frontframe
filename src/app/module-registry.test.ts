@@ -133,7 +133,18 @@ describe("core module registry", () => {
       "分类任务池",
     );
     expect(moduleRegistry.get("reviewTasks").navigation?.label).toBe(
-      "审查任务池",
+      "审查任务（只读）",
+    );
+    expect(
+      moduleRegistry
+        .getNavigation()
+        .flatMap((section) => section.items.map((item) => item.moduleId)),
+    ).toEqual(
+      expect.arrayContaining([
+        "fileClassification",
+        "classificationTasks",
+        "knowledge",
+      ]),
     );
     expect(moduleRegistry.find("not-registered")).toBeUndefined();
   });

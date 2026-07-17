@@ -29,6 +29,7 @@ const reportSections = [
   "语义检测",
   "冲突检测",
   "一致性检测",
+  "可执行性检测",
   "风险处理日志",
 ] as const;
 
@@ -38,9 +39,11 @@ const categoryLabels = {
   semantic: "语义检测",
   conflict: "冲突检测",
   consistency: "一致性检测",
+  executability: "可执行性检测",
 } as const;
 
 const levelLabels = {
+  critical: "严重风险",
   high: "高风险",
   medium: "中风险",
   low: "低风险",
@@ -55,7 +58,9 @@ const riskStateLabels: Record<ReviewRiskState, string> = {
 function riskTone(risk: ReviewRisk) {
   if (risk.state === "resolved") return "success" as const;
   if (risk.state === "ignored") return "neutral" as const;
-  if (risk.level === "high") return "danger" as const;
+  if (risk.level === "critical" || risk.level === "high") {
+    return "danger" as const;
+  }
   if (risk.level === "medium") return "warning" as const;
   return "info" as const;
 }
@@ -72,6 +77,9 @@ function sectionRisks(
   }
   if (section === "一致性检测") {
     return report.risks.filter((risk) => risk.category === "consistency");
+  }
+  if (section === "可执行性检测") {
+    return report.risks.filter((risk) => risk.category === "executability");
   }
   return report.risks;
 }
@@ -111,6 +119,7 @@ export function ReviewReportScreen({
       semantic: report.risks.filter((risk) => risk.category === "semantic").length,
       conflict: report.risks.filter((risk) => risk.category === "conflict").length,
       consistency: report.risks.filter((risk) => risk.category === "consistency").length,
+      executability: report.risks.filter((risk) => risk.category === "executability").length,
     }),
     [report],
   );
@@ -251,6 +260,7 @@ export function ReviewReportScreen({
                 <div><span>语义检测</span><strong>{metrics.semantic} 项</strong></div>
                 <div><span>冲突检测</span><strong>{metrics.conflict} 项</strong></div>
                 <div><span>一致性检测</span><strong>{metrics.consistency} 项</strong></div>
+                <div><span>可执行性检测</span><strong>{metrics.executability} 项</strong></div>
               </div>
             </>
           ) : null}
@@ -284,6 +294,11 @@ export function ReviewReportScreen({
                     <span>
                       <Status tone={riskTone(risk)}>
                         {riskStateLabels[risk.state]}
+                      </Status>
+                      <Status tone={risk.source === "STUB" ? "warning" : "info"}>
+                        {risk.source === "STUB"
+                          ? "Stub 演示结果"
+                          : "AI 结果"}
                       </Status>
                       <small>{categoryLabels[risk.category]} · {levelLabels[risk.level]}</small>
                     </span>

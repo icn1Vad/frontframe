@@ -1,8 +1,18 @@
-import { appServices, definePageConfig, type AppPage } from "../app";
+import {
+  definePageConfig,
+  getRuntimeAppServices,
+  isJavaSliceEnabled,
+  type AppPage,
+} from "../app";
 import { FileClassificationScreen } from "../features/documents";
 
 const FileClassification: AppPage = function FileClassification() {
-  return <FileClassificationScreen api={appServices.classification} />;
+  return (
+    <FileClassificationScreen
+      api={getRuntimeAppServices().classification}
+      useDemoInitialFiles={!isJavaSliceEnabled()}
+    />
+  );
 };
 
 FileClassification.pageConfig = definePageConfig({

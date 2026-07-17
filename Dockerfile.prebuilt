@@ -1,0 +1,22 @@
+# Offline fallback for a source tree whose `npm run build` has already passed.
+# The normal Dockerfile remains the canonical clean build path.
+FROM node:24.18.0-bookworm-slim
+
+WORKDIR /app
+
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    HOSTNAME=0.0.0.0 \
+    PORT=3000
+
+COPY --chown=node:node package.json package-lock.json ./
+COPY --chown=node:node node_modules ./node_modules
+COPY --chown=node:node .next ./.next
+COPY --chown=node:node public ./public
+COPY --chown=node:node next.config.mjs ./next.config.mjs
+
+USER node
+
+EXPOSE 3000
+
+CMD ["npm", "run", "start"]

@@ -50,8 +50,8 @@ export const mockAuthApi: AuthApi = {
     void payload;
     await waitForMockResponse();
     return {
-      status: "unavailable",
-      message: "注册申请暂未开放，请联系管理员创建账号。",
+      status: "registered",
+      message: "注册成功，请使用新账号登录。",
     };
   },
 

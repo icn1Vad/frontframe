@@ -1,8 +1,11 @@
 import type { GetServerSideProps } from "next";
 import { useEffect, useState } from "react";
 import {
-  appServices,
+  createRequestScopedAppServices,
   definePageConfig,
+  getRuntimeAppServices,
+  isJavaSliceEnabled,
+  redirectToLoginOnUnauthorized,
   type AppPage,
 } from "../../../app";
 import {
@@ -25,25 +28,29 @@ interface ReviewReportPageProps {
 const ReviewReportPage: AppPage<ReviewReportPageProps> =
   function ReviewReportPage(props) {
     const taskId = createReviewTaskId(props.taskId);
+    const services = getRuntimeAppServices();
+    const javaReadOnly = isJavaSliceEnabled();
     const [report, setReport] = useState(props.initialReport);
-    const [readOnly, setReadOnly] = useState(props.initialReadOnly);
+    const [readOnly, setReadOnly] = useState(
+      props.initialReadOnly || javaReadOnly,
+    );
     const [loading, setLoading] = useState(props.initialReport === null);
 
     useEffect(() => {
       let active = true;
       void Promise.all([
-        appServices.reviewTasks.getReport(taskId),
-        appServices.documents.getByReviewTaskId(taskId),
+        services.reviewTasks.getReport(taskId),
+        services.documents.getByReviewTaskId(taskId),
       ]).then(([nextReport, document]) => {
         if (!active) return;
         setReport(nextReport);
-        setReadOnly(document?.state.kind !== "reviewed");
+        setReadOnly(javaReadOnly || document?.state.kind !== "reviewed");
         setLoading(false);
       });
       return () => {
         active = false;
       };
-    }, [taskId]);
+    }, [javaReadOnly, services, taskId]);
 
     if (loading) {
       return <div className="table-state">正在加载审查报告…</div>;
@@ -58,17 +65,17 @@ const ReviewReportPage: AppPage<ReviewReportPageProps> =
         initialReport={report}
         readOnly={readOnly}
         onResolveRisk={async (riskId) => {
-          return appServices.reviewTasks.resolveRisk(taskId, riskId, {
+          return services.reviewTasks.resolveRisk(taskId, riskId, {
             idempotencyKey: createIdempotencyKey("resolve-review-risk"),
           });
         }}
         onIgnoreRisk={async (riskId, reason) => {
-          return appServices.reviewTasks.ignoreRisk(taskId, riskId, reason ?? "", {
+          return services.reviewTasks.ignoreRisk(taskId, riskId, reason ?? "", {
             idempotencyKey: createIdempotencyKey("ignore-review-risk"),
           });
         }}
         onIgnoreAllRisks={async (reason) => {
-          return appServices.reviewTasks.ignoreAllRisks(taskId, reason, {
+          return services.reviewTasks.ignoreAllRisks(taskId, reason, {
             idempotencyKey: createIdempotencyKey("ignore-review-risks"),
           });
         }}
@@ -76,7 +83,7 @@ const ReviewReportPage: AppPage<ReviewReportPageProps> =
           readOnly
             ? undefined
             : async () => {
-                await appServices.reviewTasks.publish(props.documentId, {
+                await services.reviewTasks.publish(props.documentId, {
                   idempotencyKey: createIdempotencyKey("publish-review-report"),
                 });
               }
@@ -92,7 +99,7 @@ ReviewReportPage.pageConfig = definePageConfig({
 
 export const getServerSideProps: GetServerSideProps<
   ReviewReportPageProps
-> = async ({ params }) => {
+> = async ({ params, req }) => {
   const rawTaskId = params?.taskId;
   if (typeof rawTaskId !== "string") return { notFound: true };
 
@@ -103,19 +110,28 @@ export const getServerSideProps: GetServerSideProps<
     return { notFound: true };
   }
 
-  const document = await appServices.documents.getByReviewTaskId(taskId);
-  if (!document) return { notFound: true };
-  const initialReport = await appServices.reviewTasks.getReport(taskId);
+  const services = createRequestScopedAppServices({
+    backendOrigin: process.env.API_BACKEND_ORIGIN,
+    cookieHeader: req.headers.cookie,
+  });
+  try {
+    const document = await services.documents.getByReviewTaskId(taskId);
+    if (!document) return { notFound: true };
+    const initialReport = await services.reviewTasks.getReport(taskId);
 
-  return {
-    props: {
-      taskId,
-      documentId: document.id,
-      documentName: document.name,
-      initialReport,
-      initialReadOnly: document.state.kind !== "reviewed",
-    },
-  };
+    return {
+      props: {
+        taskId,
+        documentId: document.id,
+        documentName: document.name,
+        initialReport,
+        initialReadOnly:
+          isJavaSliceEnabled() || document.state.kind !== "reviewed",
+      },
+    };
+  } catch (error: unknown) {
+    return redirectToLoginOnUnauthorized(error);
+  }
 };
 
 export default ReviewReportPage;

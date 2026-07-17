@@ -1,8 +1,8 @@
-import { appServices, definePageConfig, type AppPage } from "../../../app";
+import { definePageConfig, getRuntimeAppServices, type AppPage } from "../../../app";
 import { ContractReviewTasksScreen } from "../../../features/contracts";
 
 const ContractReviewTasks: AppPage = function ContractReviewTasks() {
-  return <ContractReviewTasksScreen api={appServices.contractReview} />;
+  return <ContractReviewTasksScreen api={getRuntimeAppServices().contractReview} />;
 };
 
 ContractReviewTasks.pageConfig = definePageConfig({ moduleId: "contractReviewTasks" });

@@ -28,19 +28,19 @@ describe("mockAuthApi", () => {
     await expect(mockAuthApi.getSession()).resolves.not.toBeNull();
   });
 
-  it("reports that self-service registration is unavailable", async () => {
+  it("registers an ordinary user without an approval state", async () => {
     vi.useFakeTimers();
     const resultPromise = mockAuthApi.register({
       username: "demo-user",
       password: "demo-password",
-      requestedRole: "admin",
+      requestedRole: "user",
     });
 
     await vi.runAllTimersAsync();
 
     await expect(resultPromise).resolves.toEqual({
-      status: "unavailable",
-      message: "注册申请暂未开放，请联系管理员创建账号。",
+      status: "registered",
+      message: "注册成功，请使用新账号登录。",
     });
   });
 });

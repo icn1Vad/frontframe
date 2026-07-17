@@ -3,12 +3,12 @@ import type {
   AuthUser,
   LoginResult,
   RegisterResult,
-} from "../../features/auth";
+} from "../../features/auth/AuthApi";
 import {
   isContractEditorSession,
   type ContractReviewTask,
   type ContractRisk,
-} from "../../features/contracts";
+} from "../../features/contracts/domain";
 import type {
   BatchMutationResult,
   ClassificationCandidateStats,
@@ -38,6 +38,7 @@ import type {
   ChatMessage,
   DashboardOverview,
 } from "../../app/services";
+import { aiResultSources } from "../../shared/lib/aiResultSource";
 import { ResponseValidationError } from "./errors";
 
 type JsonRecord = Record<string, unknown>;
@@ -59,6 +60,13 @@ function string(value: unknown, label: string): string {
 function number(value: unknown, label: string): number {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     throw new ResponseValidationError(`${label} 必须是有限数字`);
+  }
+  return value;
+}
+
+function boolean(value: unknown, label: string): boolean {
+  if (typeof value !== "boolean") {
+    throw new ResponseValidationError(`${label} 必须是布尔值`);
   }
   return value;
 }
@@ -127,7 +135,7 @@ export function decodeRegisterResult(value: unknown): RegisterResult {
   return {
     status: oneOf(
       input.status,
-      ["submitted", "unavailable"] as const,
+      ["registered"] as const,
       "registerResult.status",
     ),
     message: string(input.message, "registerResult.message"),
@@ -243,6 +251,10 @@ function decodeDocumentState(value: unknown): DocumentState {
 export function decodeDocumentSummary(value: unknown): DocumentSummary {
   const input = record(value, "document");
   const operator = record(input.operator, "document.operator");
+  const capabilities = record(
+    input.capabilities,
+    "document.capabilities",
+  );
   return {
     id: createDocumentId(string(input.id, "document.id")),
     name: string(input.name, "document.name"),
@@ -255,6 +267,12 @@ export function decodeDocumentSummary(value: unknown): DocumentSummary {
       displayName: string(
         operator.displayName,
         "document.operator.displayName",
+      ),
+    },
+    capabilities: {
+      canDelete: boolean(
+        capabilities.canDelete,
+        "document.capabilities.canDelete",
       ),
     },
   };
@@ -383,12 +401,12 @@ function decodeReviewRisk(value: unknown): ReviewRisk {
     id: string(input.id, "reviewRisk.id"),
     category: oneOf(
       input.category,
-      ["semantic", "conflict", "consistency"] as const,
+      ["semantic", "conflict", "consistency", "executability"] as const,
       "reviewRisk.category",
     ),
     level: oneOf(
       input.level,
-      ["high", "medium", "low"] as const,
+      ["critical", "high", "medium", "low"] as const,
       "reviewRisk.level",
     ),
     title: string(input.title, "reviewRisk.title"),
@@ -400,6 +418,7 @@ function decodeReviewRisk(value: unknown): ReviewRisk {
       ["open", "resolved", "ignored"] as const,
       "reviewRisk.state",
     ),
+    source: oneOf(input.source, aiResultSources, "reviewRisk.source"),
     ...(resolution
       ? {
           resolution: {
@@ -554,6 +573,16 @@ export function decodeContractReviewTask(value: unknown): ContractReviewTask {
   return {
     id: string(input.id, "contractReviewTask.id"),
     version: number(input.version, "contractReviewTask.version"),
+    documentId: string(input.documentId, "contractReviewTask.documentId"),
+    documentVersionId: string(
+      input.documentVersionId,
+      "contractReviewTask.documentVersionId",
+    ),
+    fileType: oneOf(
+      input.fileType,
+      ["docx", "pdf"] as const,
+      "contractReviewTask.fileType",
+    ),
     name: string(input.name, "contractReviewTask.name"),
     size: number(input.size, "contractReviewTask.size"),
     stance: oneOf(
@@ -578,7 +607,7 @@ export function decodeContractReviewTask(value: unknown): ContractReviewTask {
     ),
     status: oneOf(
       input.status,
-      ["queued", "reviewing", "reported", "stored"] as const,
+      ["preview", "queued", "reviewing", "reported", "stored"] as const,
       "contractReviewTask.status",
     ),
     progress: number(input.progress, "contractReviewTask.progress"),
@@ -645,13 +674,13 @@ export function decodeDashboardOverview(value: unknown): DashboardOverview {
 
 function decodeChatMessage(value: unknown): ChatMessage {
   const input = record(value, "chatMessage");
-  return {
+  const role = oneOf(
+    input.role,
+    ["user", "assistant"] as const,
+    "chatMessage.role",
+  );
+  const message = {
     id: string(input.id, "chatMessage.id"),
-    role: oneOf(
-      input.role,
-      ["user", "assistant"] as const,
-      "chatMessage.role",
-    ),
     content: string(input.content, "chatMessage.content"),
     createdAt: string(input.createdAt, "chatMessage.createdAt"),
     citations: array(input.citations, "chatMessage.citations").map(
@@ -674,6 +703,19 @@ function decodeChatMessage(value: unknown): ChatMessage {
       },
     ),
   };
+  if (role === "assistant") {
+    return {
+      ...message,
+      role,
+      source: oneOf(input.source, aiResultSources, "chatMessage.source"),
+    };
+  }
+  if (input.source !== undefined) {
+    throw new ResponseValidationError(
+      "chatMessage.source 只能出现在 assistant 消息中",
+    );
+  }
+  return { ...message, role };
 }
 
 export function decodeChatConversation(value: unknown): ChatConversation {

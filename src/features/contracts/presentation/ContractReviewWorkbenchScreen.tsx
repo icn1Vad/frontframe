@@ -32,6 +32,7 @@ import {
   WpsWebOfficeEditor,
   type WpsWebOfficeEditorHandle,
 } from "./WpsWebOfficeEditor";
+import { ContractReviewSplitPane } from "./ContractReviewSplitPane";
 
 export interface ContractReviewWorkbenchScreenProps {
   readonly taskId: string;
@@ -50,6 +51,7 @@ interface ChatMessage {
 }
 
 function statusMeta(task: ContractReviewTask) {
+  if (task.status === "preview") return { label: "只读预览", tone: "info" as const };
   if (task.status === "stored") return { label: "已入库", tone: "success" as const };
   if (task.status === "reported") return { label: "报告已生成", tone: "warning" as const };
   if (task.status === "reviewing") return { label: "智能审查中", tone: "info" as const };
@@ -78,7 +80,8 @@ function riskAnchor(
   quotedText = risk.originalText,
 ): ContractDocumentAnchor {
   return {
-    documentId: task.id,
+    documentId: task.documentId,
+    documentVersionId: task.documentVersionId,
     sourceVersion: 1,
     quotedText,
     occurrence: 0,
@@ -120,13 +123,40 @@ export function ContractReviewWorkbenchScreen({
   useEffect(() => {
     let active = true;
     setLoading(true);
-    void Promise.all([api.getTask(taskId), api.getEditorSession(taskId)]).then(([
+    const editorSession = api.getEditorSession(taskId).catch((error): ContractEditorSession => ({
+      provider: "mock",
+      reason: error instanceof Error
+        ? `WPS 只读预览当前不可用：${error.message}`
+        : "WPS 只读预览当前不可用，请检查 Java WPS 配置和公网回调",
+    }));
+    void Promise.all([api.getTask(taskId), editorSession]).then(([
       result,
       session,
     ]) => {
       if (!active) return;
-      setEditorSession(session);
-      setEditorMode(session.provider === "wps" ? "wps" : "mock");
+      const sessionMatchesTask = session.provider !== "wps" || !result || (
+        result.fileType === "docx" &&
+        session.taskId === result.id &&
+        session.documentVersionId === result.documentVersionId
+      );
+      const safeSession: ContractEditorSession = sessionMatchesTask
+        ? session
+        : {
+            provider: "mock",
+            reason: result?.fileType === "pdf"
+              ? "PDF 在第一阶段只读预览，不进入 WPS Writer 编辑"
+              : "WPS 会话与当前审查任务的文档版本不一致",
+          };
+      setEditorSession(safeSession);
+      setEditorMode(safeSession.provider === "wps" ? "wps" : "mock");
+      if (safeSession.provider === "mock") {
+        setFeedback(safeSession.reason);
+      }
+      if (!sessionMatchesTask) {
+        setFeedback(result?.fileType === "pdf"
+          ? "PDF 当前仅支持只读预览"
+          : "已阻止加载与当前任务版本不一致的 WPS 会话");
+      }
       if (result) {
         setTask(result);
         setProgress(result.progress);
@@ -220,27 +250,8 @@ export function ContractReviewWorkbenchScreen({
     setFeedback(null);
     try {
       const usingWps = editorMode === "wps" && editorSession?.provider === "wps";
-      if (usingWps && state === "resolved") {
-        if (!wpsReady || !wpsEditorRef.current) {
-          throw new Error("在线编辑器尚未准备完成");
-        }
-        await wpsEditorRef.current.applyRevision({
-          anchor: riskAnchor(task, risk),
-          expectedText: risk.originalText,
-          replacementText: risk.suggestion,
-        });
-        await wpsEditorRef.current.save();
-      }
-      if (usingWps && state === "open" && risk.state === "resolved") {
-        if (!wpsReady || !wpsEditorRef.current) {
-          throw new Error("在线编辑器尚未准备完成");
-        }
-        await wpsEditorRef.current.applyRevision({
-          anchor: riskAnchor(task, risk, risk.suggestion),
-          expectedText: risk.suggestion,
-          replacementText: risk.originalText,
-        });
-        await wpsEditorRef.current.save();
+      if (usingWps && (state === "resolved" || (state === "open" && risk.state === "resolved"))) {
+        throw new Error("WPS 修订与后端同步将在第三阶段开放；当前已阻止修改旧审查任务");
       }
       const updated = await api.updateRisk(
         task.id,
@@ -301,8 +312,18 @@ export function ContractReviewWorkbenchScreen({
   const saveWpsDocument = async () => {
     if (!wpsEditorRef.current || !wpsReady) return;
     try {
-      await wpsEditorRef.current.save();
-      setFeedback("在线文档已保存，服务端将生成新的文件版本");
+      const result = await wpsEditorRef.current.save();
+      if (result.status === "ok") {
+        setEditorMode("mock");
+        setEditorSession({
+          provider: "mock",
+          reason: "文档已保存为新版本；当前审查任务保留为历史记录",
+        });
+        setWpsReady(false);
+        setFeedback("文档已保存为新版本；当前任务已停止编辑，请对新版本重新发起审查");
+      } else {
+        setFeedback("文档内容没有变化，无需创建新版本");
+      }
     } catch (error) {
       setFeedback(error instanceof Error ? error.message : "在线文档保存失败");
     }
@@ -371,7 +392,7 @@ export function ContractReviewWorkbenchScreen({
         </section>
       )}
 
-      <section className="contract-workbench" aria-label="合同审查工作台">
+      <ContractReviewSplitPane storageKey={`proofspace.contract-review.split.v1:${task.id}`}>
         <article className="contract-source-panel">
           <div className="contract-source-toolbar">
             <div><span className="contract-section-kicker">原文对照</span><h3>{editorMode === "wps" ? "在线文档编辑" : "合同原文"}</h3></div>
@@ -506,9 +527,9 @@ export function ContractReviewWorkbenchScreen({
             </div>
           ) : null}
         </aside>
-      </section>
+      </ContractReviewSplitPane>
       <div className="contract-workbench-footer">
-        <span>{feedback ?? (task.status === "stored" ? "本合同审查记录已完成入库。" : reportGenerated ? (canStore ? "全部风险已处理，可以入库。" : `还有 ${openRisks.length} 项风险待人工确认。`) : "报告生成后，风险项目和解析结果会在右侧展开。")}</span>
+        <span>{feedback ?? (task.status === "preview" ? "第一阶段仅验证真实 DOCX 的 WPS 只读打开；审查、编辑和保存尚未开放。" : task.status === "stored" ? "本合同审查记录已完成入库。" : reportGenerated ? (canStore ? "全部风险已处理，可以入库。" : `还有 ${openRisks.length} 项风险待人工确认。`) : "报告生成后，风险项目和解析结果会在右侧展开。")}</span>
         {reportGenerated && !canStore && task.status !== "stored" ? <span className="contract-footer-hint"><ShieldAlert size={13} /> 应用修改和人工忽略都会写入审计记录</span> : null}
       </div>
       {ignoreRiskId && task ? (

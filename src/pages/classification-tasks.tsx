@@ -1,14 +1,18 @@
 import type { GetServerSideProps } from "next";
 import { useRouter } from "next/router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
-  appServices,
+  createRequestScopedAppServices,
   definePageConfig,
+  getRuntimeAppServices,
+  isJavaSliceEnabled,
+  redirectToLoginOnUnauthorized,
   routes,
   type AppPage,
 } from "../app";
 import {
   ClassificationDocumentsTable,
+  DocumentPreviewPane,
   type DocumentId,
   type DocumentSummary,
   type PageResult,
@@ -29,12 +33,18 @@ function parsePage(value: string | string[] | undefined): number {
 const ClassificationTasks: AppPage<ClassificationTasksProps> =
   function ClassificationTasks({ result }) {
     const router = useRouter();
+    const services = getRuntimeAppServices();
     const [rows, setRows] = useState(result.items);
+    const loadPreview = useCallback(
+      (documentId: DocumentId, options?: { readonly signal?: AbortSignal }) =>
+        services.classificationTasks.getPreview(documentId, options),
+      [services],
+    );
 
     useEffect(() => {
       let active = true;
       setRows(result.items);
-      void appServices.classificationTasks.list({
+      void services.classificationTasks.list({
         page: result.page,
         pageSize: result.pageSize,
         sort: { by: "updatedAt", direction: "desc" },
@@ -44,7 +54,7 @@ const ClassificationTasks: AppPage<ClassificationTasksProps> =
       return () => {
         active = false;
       };
-    }, [result]);
+    }, [result, services]);
 
     const replaceRow = (updated: DocumentSummary) => {
       setRows((current) =>
@@ -65,15 +75,20 @@ const ClassificationTasks: AppPage<ClassificationTasksProps> =
           commands={{
             publish: async (documentId) => {
               replaceRow(
-                await appServices.classificationTasks.publish(
+                await services.classificationTasks.publish(
                   documentId,
                   mutationOptions("publish-classification"),
                 ),
               );
             },
             startReview: async (documentId) => {
+              if (isJavaSliceEnabled()) {
+                throw new Error(
+                  "当前 Java 演示切片暂未开放通用审查，请使用直接入库。",
+                );
+              }
               replaceRow(
-                await appServices.classificationTasks.startReview(
+                await services.classificationTasks.startReview(
                   documentId,
                   mutationOptions("start-review"),
                 ),
@@ -82,12 +97,19 @@ const ClassificationTasks: AppPage<ClassificationTasksProps> =
           }}
           onDelete={async (documentId: DocumentId) => {
             replaceRow(
-              await appServices.classificationTasks.softDelete(
+              await services.classificationTasks.softDelete(
                 documentId,
                 mutationOptions("delete-classification"),
               ),
             );
           }}
+          renderPreview={(document) => (
+            <DocumentPreviewPane
+              documentId={document.id}
+              fallbackName={document.name}
+              loadPreview={loadPreview}
+            />
+          )}
           pagination={{
             page: result.page,
             pageCount: result.pageCount,
@@ -109,14 +131,24 @@ ClassificationTasks.pageConfig = definePageConfig({
 
 export const getServerSideProps: GetServerSideProps<
   ClassificationTasksProps
-> = async ({ query }) => ({
-  props: {
-    result: await appServices.classificationTasks.list({
-      page: parsePage(query.page),
-      pageSize: 25,
-      sort: { by: "updatedAt", direction: "desc" },
-    }),
-  },
-});
+> = async ({ query, req }) => {
+  const services = createRequestScopedAppServices({
+    backendOrigin: process.env.API_BACKEND_ORIGIN,
+    cookieHeader: req.headers.cookie,
+  });
+  try {
+    return {
+      props: {
+        result: await services.classificationTasks.list({
+          page: parsePage(query.page),
+          pageSize: 25,
+          sort: { by: "updatedAt", direction: "desc" },
+        }),
+      },
+    };
+  } catch (error: unknown) {
+    return redirectToLoginOnUnauthorized(error);
+  }
+};
 
 export default ClassificationTasks;

@@ -70,6 +70,7 @@ interface CandidateFilters {
 
 export interface FileClassificationScreenProps {
   readonly api: ClassificationWorkflowApi;
+  readonly useDemoInitialFiles?: boolean;
 }
 
 type DialogState =
@@ -155,20 +156,25 @@ function formatFileSize(file: File): string {
   const fileType = {
     pdf: "便携文档",
     docx: "文字文档",
-    xlsx: "表格文档",
     txt: "纯文本",
+    md: "Markdown",
   }[extension] ?? "文件";
   return `${fileType} · ${size}`;
 }
 
-export function FileClassificationScreen({ api }: FileClassificationScreenProps) {
+export function FileClassificationScreen({
+  api,
+  useDemoInitialFiles = true,
+}: FileClassificationScreenProps) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const selectAllRef = useRef<HTMLInputElement>(null);
   const initializedFromUrl = useRef(false);
   const [stage, setStage] = useState<Stage>("empty");
   const [dialog, setDialog] = useState<DialogState>(null);
-  const [files, setFiles] = useState<readonly UploadFile[]>(initialFiles);
+  const [files, setFiles] = useState<readonly UploadFile[]>(
+    useDemoInitialFiles ? initialFiles : [],
+  );
   const [result, setResult] =
     useState<PageResult<ClassificationCandidateRecord>>(emptyResult);
   const [stats, setStats] = useState<ClassificationCandidateStats>(emptyStats);
@@ -376,11 +382,14 @@ export function FileClassificationScreen({ api }: FileClassificationScreenProps)
       });
       setSelectedIds(new Set(response.failed.map((failure) => failure.id as ClassificationCandidateId)));
       await refreshStats();
-      setFeedback(
-        response.failed.length
-          ? `已确认 ${response.succeeded.length} 项，${response.failed.length} 项失败并保留在列表中`
-          : `已确认 ${response.succeeded.length} 项并移入分类任务池`,
-      );
+      if (response.failed.length) {
+        setFeedback(
+          `已确认 ${response.succeeded.length} 项，${response.failed.length} 项失败并保留在列表中`,
+        );
+      } else {
+        setFeedback(`已确认 ${response.succeeded.length} 项，正在进入分类任务池`);
+        await router.push(routes.classificationTasks);
+      }
     } catch (error) {
       setSaveStates((current) => {
         const next = { ...current };
@@ -540,7 +549,7 @@ export function FileClassificationScreen({ api }: FileClassificationScreenProps)
       ref={fileInputRef}
       className="visually-hidden"
       type="file"
-      accept=".pdf,.docx,.xlsx,.txt"
+      accept=".pdf,.docx,.txt,.md"
       multiple
       onChange={handleFileInput}
     />
@@ -556,17 +565,26 @@ export function FileClassificationScreen({ api }: FileClassificationScreenProps)
           <button
             className={`dropzone${isDragging ? " dragging" : ""}`}
             type="button"
-            onClick={() => setStage("pending")}
+            onClick={() => fileInputRef.current?.click()}
             onDragEnter={handleDragOver}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
           >
             <span className="plus-circle"><Plus /></span>
-            <strong>拖拽文件到这里，或点击查看待上传文件</strong>
-            <small>支持便携文档、文字文档、表格文档和纯文本，最大 50 兆字节</small>
-            <span className="secondary">进入上传区</span>
+            <strong>拖拽文件到这里，或点击选择文件</strong>
+            <small>支持 PDF、DOCX、TXT 和 Markdown，最大 50 兆字节</small>
+            <span className="secondary">选择文件</span>
           </button>
+          <div className="upload-entry-actions">
+            <button
+              className="secondary"
+              type="button"
+              onClick={() => setStage("confirm")}
+            >
+              查看待确认文件
+            </button>
+          </div>
         </Surface>
         {feedbackNode}
       </PageStack>
@@ -592,7 +610,7 @@ export function FileClassificationScreen({ api }: FileClassificationScreenProps)
             >
               <span className="plus-circle"><Plus /></span>
               <strong>继续拖拽文件到这里</strong>
-              <small>支持便携文档、文字文档、表格文档和纯文本，最大 50 兆字节</small>
+              <small>支持 PDF、DOCX、TXT 和 Markdown，最大 50 兆字节</small>
               <span className="secondary">继续添加文件</span>
             </button>
             <div className="pending-list">
@@ -669,7 +687,7 @@ export function FileClassificationScreen({ api }: FileClassificationScreenProps)
         <PageToolbar className="classification-toolbar">
           <div>
             <h2 id="classification-heading">分类确认</h2>
-            <p>四项推荐结果均可修改；确认后人工结果生效并进入分类任务池。</p>
+            <p>推荐结果均可修改；确认后进入分类任务池，再选择直接入库或开始审查。</p>
           </div>
           <button className="secondary" type="button" onClick={() => setStage("pending")}>
             继续上传
@@ -838,7 +856,7 @@ export function FileClassificationScreen({ api }: FileClassificationScreenProps)
           onClose={() => setDialog(null)}
         >
           <p className="dialog-copy">
-            分类中的文件会采用当前人工填写结果；后续智能分类结果将被忽略。成功文件会立即进入分类任务池。
+            分类中的文件会采用当前人工填写结果；后续智能分类结果将被忽略。全部确认成功后会进入分类任务池，但不会自动入库或自动进入审查。
           </p>
           <div className="modal-actions">
             <button className="secondary" type="button" onClick={() => setDialog(null)}>取消</button>

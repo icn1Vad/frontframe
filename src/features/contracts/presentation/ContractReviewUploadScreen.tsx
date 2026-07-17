@@ -22,6 +22,8 @@ interface PendingContract {
   readonly file: File;
 }
 
+const MAX_CONTRACT_FILE_SIZE = 50 * 1024 * 1024;
+
 function formatFileSize(size: number): string {
   if (size < 1024) return `${size} 字节`;
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} 千字节`;
@@ -29,7 +31,7 @@ function formatFileSize(size: number): string {
 }
 
 function isSupportedContract(file: File): boolean {
-  return /\.(docx|pdf)$/i.test(file.name);
+  return /\.docx$/i.test(file.name);
 }
 
 export function ContractReviewUploadScreen({
@@ -53,8 +55,16 @@ export function ContractReviewUploadScreen({
 
   const addFile = (file: File | undefined) => {
     if (!file) return;
+    if (file.size === 0) {
+      setFeedback("不能上传空合同文件");
+      return;
+    }
+    if (file.size > MAX_CONTRACT_FILE_SIZE) {
+      setFeedback("合同文件不能超过 50 兆字节");
+      return;
+    }
     if (!isSupportedContract(file)) {
-      setFeedback("合同审查目前只接受文字文档或便携文档");
+      setFeedback("第一阶段只接受 DOCX 文件");
       return;
     }
     setPendingFile({ name: file.name, size: file.size, file });
@@ -127,7 +137,7 @@ export function ContractReviewUploadScreen({
             ref={fileInputRef}
             className="visually-hidden"
             type="file"
-            accept=".docx,.pdf"
+            accept=".docx"
             onChange={handleFileInput}
           />
           <button
@@ -141,7 +151,7 @@ export function ContractReviewUploadScreen({
           >
             <span className="contract-dropzone-icon"><UploadCloud size={30} /></span>
             <strong>将合同拖入这里，或点击选择文件</strong>
-            <small>支持文字文档和便携文档，单个文件最大 50 兆字节</small>
+            <small>第一阶段支持 DOCX 的 WPS 只读预览，单个文件最大 50 兆字节</small>
             <span className="secondary">选择合同文件</span>
           </button>
           <div className="contract-upload-note">

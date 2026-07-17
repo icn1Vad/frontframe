@@ -6,7 +6,13 @@
 `openapi/proofspace.yaml` 为机器可读的权威定义，以本文档解释业务语义、
 状态流转、并发控制和安全边界。
 
-当前前端仍默认使用 Mock Adapter。真实联调时通过
+该 OpenAPI 是长期完整标准，不表示单演示机 Java 阶段一次实现全部端点。
+当前实施切片包含认证（普通用户直接注册）、上传、分类、直接入库、租户内共享知识库、
+智能问答、Stub 通用审查结果，以及合同专项审查的第一阶段 DOCX 只读预览。
+合同 AI 审查、风险生成、WPS 编辑与保存、报告生成与发布继续保留在长期契约中，
+但不进入当前 Java 交付范围。
+
+前端默认可保留 Mock Adapter；设置 `NEXT_PUBLIC_PROOFSPACE_JAVA_SLICE=true` 后通过
 `src/infrastructure/http` 导出的 `createBrowserHttpAppServices()` 或
 `createServerHttpAppServices()` 切换到 HTTP Adapter，不应在页面组件中直接拼接 URL。
 
@@ -39,6 +45,11 @@ const services = createServerHttpAppServices({
   `PUT` 外，所有非 GET 请求通过 `X-CSRF-Token` Header 提交。
 - 会话续期由后端采用滑动过期策略完成，不向前端暴露 Refresh Token。
 - 未认证返回 `401`；已认证但权限不足返回 `403`。
+
+`POST /auth/registrations` 在默认演示租户中直接创建普通用户，不经过审核，
+也不自动登录。`requestedRole` 固定为 `user`，自助注册不得创建管理员。
+服务端只保存 bcrypt 密码哈希，不得记录请求中的明文密码；用户名重复返回
+HTTP 409。
 
 ### 2.2 文件：对象存储预签名上传
 
@@ -176,7 +187,7 @@ GET /api/v1/classification/candidates?state=classifying&state=awaiting-confirmat
 | Method | Path | 权限 | 用途 |
 |---|---|---|---|
 | POST | `/auth/login` | 公开 | 登录并设置会话 Cookie |
-| POST | `/auth/registrations` | 公开 | 提交账号申请 |
+| POST | `/auth/registrations` | 公开 | 直接创建默认租户普通用户 |
 | GET | `/auth/session` | 可匿名 | 获取当前会话和 CSRF Token |
 | POST | `/auth/logout` | 已登录 | 清除会话 Cookie |
 | GET | `/dashboard/overview` | `dashboard:read` | 工作台统计 |
@@ -229,16 +240,29 @@ GET /api/v1/classification/candidates?state=classifying&state=awaiting-confirmat
 
 ### 4.6 合同专项审查
 
+当前第一阶段只开放下表前四个只读预览相关入口，权限复用现有
+`documents:read` / `documents:write`。其余合同审查写入口是长期标准，尚未实现。
+
 | Method | Path | 权限 | 用途 |
 |---|---|---|---|
-| GET | `/contract-review/tasks` | `contracts:read` | 获取合同任务 |
-| POST | `/contract-review/tasks` | `contracts:write` | 使用 `fileId` 创建合同任务 |
-| GET | `/contract-review/tasks/{taskId}` | `contracts:read` | 获取合同任务、条款和风险 |
-| GET | `/contract-review/tasks/{taskId}/editor-session` | `contracts:read` | 获取在线编辑器短期会话 |
+| GET | `/contract-review/tasks` | `documents:read` | 获取当前用户的合同预览任务 |
+| POST | `/contract-review/tasks` | `documents:write` | 使用 DOCX `fileId` 创建真实初始版本和预览任务 |
+| GET | `/contract-review/tasks/{taskId}` | `documents:read` | 获取任务；第一阶段条款和风险为空 |
+| GET | `/contract-review/tasks/{taskId}/editor-session` | `documents:read` | 获取 WPS 只读短期会话 |
 | POST | `/contract-review/tasks/{taskId}/start` | `contracts:write` | 启动合同审查 |
 | POST | `/contract-review/tasks/{taskId}/report` | `contracts:write` | 生成报告 |
 | PATCH | `/contract-review/tasks/{taskId}/risks/{riskId}` | `contracts:write` | 处理、忽略或撤销风险 |
 | POST | `/contract-review/tasks/{taskId}/store` | `contracts:write` | 入库并创建公共知识条目 |
+
+在线编辑器会话的长期正式入口为
+`POST /document-versions/{documentVersionId}/office-sessions`，上述任务级 GET 仅作为
+兼容入口。会话必须绑定当前用户、任务和不可变的 `documentVersionId`，返回
+`Cache-Control: no-store`。AppID 可动态下发；AppSecret 只能从 Java 服务器受限 secret
+文件读取，禁止进入浏览器、环境变量模板、仓库或日志。
+
+第一阶段任务状态为 `preview`，权限固定为只读，不调用任何保存接口。后续每次 WPS
+成功保存必须创建新的 `DocumentVersion`。旧任务和旧风险结果继续绑定旧版本，
+不得自动迁移或继续修改新版本；可以复制审查配置，但不能复制风险定位结果。
 
 ### 4.7 知识库
 
@@ -480,7 +504,7 @@ V1 默认限制：
 - 单文件最大 50 MB。
 - 单批最多 20 个文件。
 - 分类支持：PDF、DOC、DOCX、TXT。
-- 合同专项审查支持：PDF、DOCX。
+- 合同专项审查第一阶段只支持 DOCX；PDF 预览属于后续范围。
 - 后端必须同时校验扩展名、MIME 和文件签名，不能只信任浏览器 MIME。
 - 文件完成安全检查前不得进入 AI 解析。
 - 预签名地址默认 10 分钟过期。
@@ -516,13 +540,20 @@ V1 默认限制：
 
 ## 10. 前后端联调顺序
 
-1. `/auth/login`、`/auth/session`、`/auth/logout`。
-2. 上传三步协议。
-3. 分类候选列表、批量确认和批量删除。
-4. 分类任务池和通用审查任务池。
-5. 风险报告及入库。
-6. 合同专项审查。
-7. 知识库和问答。
-8. 在线编辑器会话。
+当前单演示机 Java 阶段：
+
+1. `/auth/login`、`/auth/session`、`/auth/logout` 和普通用户直接注册。
+2. 智能问答会话、消息、引用和 Stub 来源标识。
+3. 通用审查任务的只读进度与 Stub 风险结果。
+
+后续完整标准阶段：
+
+1. 上传三步协议。
+2. 分类候选列表、批量确认和批量删除。
+3. 分类任务池和完整通用审查任务池。
+4. 风险处置、入库、报告生成与发布。
+5. 合同专项审查。
+6. 完整知识库。
+7. 在线编辑器会话。
 
 每完成一组端点，使用 OpenAPI 示例做契约测试，确认错误码、幂等和状态流转后再进入下一组。

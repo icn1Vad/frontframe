@@ -72,7 +72,9 @@ export class HttpClient {
 
   constructor(options: HttpClientOptions = {}) {
     this.baseUrl = options.baseUrl ?? "/api/v1";
-    this.fetchImplementation = options.fetchImplementation ?? fetch;
+    this.fetchImplementation =
+      options.fetchImplementation ??
+      ((input, init) => globalThis.fetch(input, init));
     this.defaultHeaders = options.defaultHeaders ?? {};
     this.csrfToken = options.initialCsrfToken;
     this.onUnauthorized = options.onUnauthorized;

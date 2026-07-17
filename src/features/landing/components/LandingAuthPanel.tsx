@@ -8,8 +8,8 @@ import {
   useState,
 } from "react";
 import { routes } from "../../../app/routes";
-import { appServices } from "../../../app/services";
-import { type AuthMode, type RequestedRole } from "../../auth";
+import { getRuntimeAppServices } from "../../../app/runtimeServices";
+import { type AuthMode } from "../../auth";
 
 interface Feedback {
   readonly kind: "success" | "info" | "error";
@@ -28,6 +28,7 @@ function errorMessage(error: unknown): string {
 
 export function LandingAuthPanel() {
   const router = useRouter();
+  const services = getRuntimeAppServices();
   const usernameInputRef = useRef<HTMLInputElement>(null);
   const loginTabRef = useRef<HTMLButtonElement>(null);
   const registerTabRef = useRef<HTMLButtonElement>(null);
@@ -91,21 +92,18 @@ export function LandingAuthPanel() {
 
     try {
       if (mode === "login") {
-        const result = await appServices.auth.login({ username, password });
+        const result = await services.auth.login({ username, password });
         setFeedback({ kind: "success", message: result.message });
         await router.push(routes.dashboard);
         return;
       }
 
-      const requestedRole = String(
-        formData.get("requestedRole") ?? "user",
-      ) as RequestedRole;
-      const result = await appServices.auth.register({
+      const result = await services.auth.register({
         username,
         password,
-        requestedRole,
+        requestedRole: "user",
       });
-      setFeedback({ kind: "info", message: result.message });
+      setFeedback({ kind: "success", message: result.message });
     } catch (error) {
       setFeedback({ kind: "error", message: errorMessage(error) });
     } finally {
@@ -114,10 +112,10 @@ export function LandingAuthPanel() {
   }
 
   const isLogin = mode === "login";
-  const title = isLogin ? "登录工作区" : "申请访问工作区";
+  const title = isLogin ? "登录工作区" : "创建普通用户";
   const description = isLogin
     ? "输入账号信息，进入企业知识治理工作区。"
-    : "提交账号申请，权限需由管理员在服务端审核。";
+    : "注册后可直接登录，账号将加入当前演示工作区。";
 
   return (
     <section className="landing-auth-card" aria-labelledby="auth-card-title">
@@ -172,23 +170,6 @@ export function LandingAuthPanel() {
             />
           </label>
 
-          {!isLogin ? (
-            <label htmlFor="landing-requested-role">
-              申请角色
-              <select
-                defaultValue="user"
-                disabled={isSubmitting}
-                id="landing-requested-role"
-                name="requestedRole"
-                required
-              >
-                <option value="user">普通用户</option>
-                <option value="admin">管理员（申请）</option>
-              </select>
-              <small>管理员权限必须由服务端审核后授予。</small>
-            </label>
-          ) : null}
-
           <label htmlFor="landing-password">
             密码
             <input
@@ -211,10 +192,10 @@ export function LandingAuthPanel() {
               {isSubmitting
                 ? isLogin
                   ? "登录中…"
-                  : "提交中…"
+                  : "注册中…"
                 : isLogin
                   ? "进入工作台"
-                  : "提交申请"}
+                  : "创建账号"}
             </span>
             <ArrowRight aria-hidden="true" size={17} strokeWidth={1.8} />
           </button>
@@ -235,7 +216,7 @@ export function LandingAuthPanel() {
           onClick={() => selectMode(isLogin ? "register" : "login", "input")}
           type="button"
         >
-          {isLogin ? "还没有账号？提交注册申请" : "已有账号？返回登录"}
+          {isLogin ? "还没有账号？注册普通用户" : "已有账号？返回登录"}
         </button>
       </div>
     </section>

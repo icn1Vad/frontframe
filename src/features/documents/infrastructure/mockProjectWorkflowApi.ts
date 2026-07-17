@@ -44,7 +44,7 @@ const reviewReportStorageKey = "proofspace.review-reports.v1";
 
 const reviewRiskSeeds: readonly Omit<
   ReviewRisk,
-  "id" | "state" | "resolution"
+  "id" | "state" | "source" | "resolution"
 >[] = [
   {
     category: "semantic",
@@ -108,6 +108,17 @@ function createReviewReport(
       ...risk,
       id: `${reviewTaskId}-risk-${index + 1}`,
       state: "open",
+      source: "STUB",
+    })),
+  };
+}
+
+function normalizeMockReport(report: ReviewReport): ReviewReport {
+  return {
+    ...report,
+    risks: report.risks.map((risk) => ({
+      ...risk,
+      source: risk.source ?? "STUB",
     })),
   };
 }
@@ -354,6 +365,7 @@ export class MockClassificationWorkflowApi
         category: input.category,
         state: { kind: "pending", queuedAt: now() },
         operator,
+        capabilities: { canDelete: true },
       };
       this.documents.upsert("classification", document);
       this.candidates = this.candidates.filter((item) => item.id !== input.id);
@@ -631,13 +643,14 @@ export class MockReviewTaskPoolApi implements ReviewTaskPoolApi {
         try {
           const reports = JSON.parse(stored) as Record<string, ReviewReport>;
           const report = reports[reviewTaskId];
-          if (report) return report;
+          if (report) return normalizeMockReport(report);
         } catch {
           window.localStorage.removeItem(reviewReportStorageKey);
         }
       }
     }
-    return this.reports.get(reviewTaskId);
+    const report = this.reports.get(reviewTaskId);
+    return report ? normalizeMockReport(report) : undefined;
   }
 
   private writeReport(report: ReviewReport): void {

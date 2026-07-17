@@ -1,13 +1,16 @@
 import type { GetServerSideProps } from "next";
 import { useRouter } from "next/router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
-  appServices,
+  createRequestScopedAppServices,
   definePageConfig,
+  getRuntimeAppServices,
+  redirectToLoginOnUnauthorized,
   routes,
   type AppPage,
 } from "../app";
 import {
+  DocumentPreviewPane,
   KnowledgeDocumentsTable,
   KnowledgeGraphView,
   KnowledgeToolbar,
@@ -38,18 +41,24 @@ const Knowledge: AppPage<KnowledgeProps> = function Knowledge({
   search,
 }) {
   const router = useRouter();
+  const services = getRuntimeAppServices();
   const [query, setQuery] = useState(search);
   const [view, setView] = useState<KnowledgeView>("classic");
   const [rows, setRows] = useState(result.items);
   const [graph, setGraph] = useState<KnowledgeGraph | null>(null);
   const [graphLoading, setGraphLoading] = useState(false);
   const [graphError, setGraphError] = useState<string | null>(null);
+  const loadPreview = useCallback(
+    (documentId: DocumentSummary["id"], options?: { readonly signal?: AbortSignal }) =>
+      services.knowledge.getPreview(documentId, options),
+    [services],
+  );
 
   useEffect(() => setQuery(search), [search]);
   useEffect(() => setRows(result.items), [result.items]);
   useEffect(() => {
     let active = true;
-    void appServices.knowledge.list({
+    void services.knowledge.list({
       page: result.page,
       pageSize: result.pageSize,
       search: search || undefined,
@@ -60,14 +69,14 @@ const Knowledge: AppPage<KnowledgeProps> = function Knowledge({
     return () => {
       active = false;
     };
-  }, [result.page, result.pageSize, search]);
+  }, [result.page, result.pageSize, search, services]);
 
   useEffect(() => {
     if (view !== "graph") return;
     let active = true;
     setGraphLoading(true);
     setGraphError(null);
-    void appServices.knowledge.getGraph()
+    void services.knowledge.getGraph()
       .then((nextGraph) => {
         if (active) setGraph(nextGraph);
       })
@@ -84,7 +93,7 @@ const Knowledge: AppPage<KnowledgeProps> = function Knowledge({
     return () => {
       active = false;
     };
-  }, [view, rows]);
+  }, [services, view, rows]);
 
   const navigate = (page: number, nextSearch = search) => {
     void router.push({
@@ -114,13 +123,20 @@ const Knowledge: AppPage<KnowledgeProps> = function Knowledge({
         <KnowledgeDocumentsTable
           rows={rows}
           onDelete={async (documentId) => {
-            await appServices.knowledge.softDelete(documentId, {
+            await services.knowledge.softDelete(documentId, {
               idempotencyKey: createIdempotencyKey("delete-knowledge"),
             });
             setRows((current) =>
               current.filter((document) => document.id !== documentId),
             );
           }}
+          renderPreview={(document) => (
+            <DocumentPreviewPane
+              documentId={document.id}
+              fallbackName={document.name}
+              loadPreview={loadPreview}
+            />
+          )}
           pagination={{
             page: result.page,
             pageCount: result.pageCount,
@@ -136,19 +152,28 @@ Knowledge.pageConfig = definePageConfig({ moduleId: "knowledge" });
 
 export const getServerSideProps: GetServerSideProps<KnowledgeProps> = async ({
   query,
+  req,
 }) => {
   const search = firstQueryValue(query.q).trim();
-  return {
-    props: {
-      search,
-      result: await appServices.knowledge.list({
-        page: parsePage(query.page),
-        pageSize: 25,
-        search: search || undefined,
-        sort: { by: "updatedAt", direction: "desc" },
-      }),
-    },
-  };
+  const services = createRequestScopedAppServices({
+    backendOrigin: process.env.API_BACKEND_ORIGIN,
+    cookieHeader: req.headers.cookie,
+  });
+  try {
+    return {
+      props: {
+        search,
+        result: await services.knowledge.list({
+          page: parsePage(query.page),
+          pageSize: 25,
+          search: search || undefined,
+          sort: { by: "updatedAt", direction: "desc" },
+        }),
+      },
+    };
+  } catch (error: unknown) {
+    return redirectToLoginOnUnauthorized(error);
+  }
 };
 
 export default Knowledge;

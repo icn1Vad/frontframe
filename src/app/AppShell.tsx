@@ -9,6 +9,10 @@ import {
 } from "./module-registry";
 import type { AppPageConfig } from "./page-config";
 import { demoSession, type AppSession } from "./runtime";
+import {
+  getRuntimeAppServices,
+  isJavaSliceEnabled,
+} from "./runtimeServices";
 
 export interface AppShellProps {
   readonly config: AppPageConfig;
@@ -24,6 +28,9 @@ export function AppShell({
   session = demoSession,
 }: AppShellProps) {
   const router = useRouter();
+  const runtimeServices = getRuntimeAppServices();
+  const usesJavaSlice = isJavaSliceEnabled();
+  const [activeSession, setActiveSession] = useState(session);
   const [navigationOpen, setNavigationOpen] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
   const [collapsedSectionIds, setCollapsedSectionIds] = useState<Set<string>>(
@@ -37,7 +44,38 @@ export function AppShell({
   const title = config.title ?? moduleDefinition.title;
   const subtitle = config.subtitle ?? moduleDefinition.subtitle;
   const navigation = registry.getNavigation();
-  const userInitial = session.user.displayName.trim().slice(0, 1) || "用";
+  const userInitial =
+    activeSession.user.displayName.trim().slice(0, 1) || "用";
+
+  useEffect(() => {
+    setActiveSession(session);
+    if (!usesJavaSlice) return;
+
+    let active = true;
+    void runtimeServices.auth.getSession()
+      .then((authSession) => {
+        if (!active) return;
+        if (!authSession) {
+          window.location.assign("/?auth=login#experience");
+          return;
+        }
+        setActiveSession({
+          user: {
+            displayName: authSession.user.displayName,
+            roleLabel: authSession.user.roleLabel,
+          },
+          signOut: session.signOut,
+        });
+      })
+      .catch(() => {
+        // A 401 is redirected by the browser HTTP client. For transient
+        // failures keep the shell usable until the next request can retry.
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [runtimeServices, session, usesJavaSlice]);
 
   useEffect(() => {
     const closeNavigation = () => {
@@ -104,9 +142,17 @@ export function AppShell({
     });
   };
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
     setAccountMenuOpen(false);
-    session.signOut?.();
+    if (usesJavaSlice) {
+      try {
+        await runtimeServices.auth.logout();
+      } finally {
+        window.location.assign("/?auth=login#experience");
+      }
+      return;
+    }
+    activeSession.signOut?.();
   };
 
   return (
@@ -227,13 +273,13 @@ export function AppShell({
               <h1>{title}</h1>
               <p>{subtitle}</p>
             </div>
-            {session.signOut ? (
+            {activeSession.signOut ? (
               <div className="account-menu" ref={accountMenuRef}>
                 <button
                   ref={accountTriggerRef}
                   type="button"
                   className="account-trigger"
-                  aria-label={`用户菜单，当前用户：${session.user.displayName}`}
+                  aria-label={`用户菜单，当前用户：${activeSession.user.displayName}`}
                   aria-haspopup="menu"
                   aria-expanded={accountMenuOpen}
                   onClick={() => setAccountMenuOpen((open) => !open)}
@@ -242,8 +288,8 @@ export function AppShell({
                     {userInitial}
                   </span>
                   <span className="account-copy">
-                    <strong>{session.user.displayName}</strong>
-                    <small>{session.user.roleLabel}</small>
+                    <strong>{activeSession.user.displayName}</strong>
+                    <small>{activeSession.user.roleLabel}</small>
                   </span>
                   <ChevronDown
                     className="account-chevron"
@@ -258,15 +304,15 @@ export function AppShell({
                         {userInitial}
                       </span>
                       <span>
-                        <strong>{session.user.displayName}</strong>
-                        <small>{session.user.roleLabel}</small>
+                        <strong>{activeSession.user.displayName}</strong>
+                        <small>{activeSession.user.roleLabel}</small>
                       </span>
                     </div>
                     <button
                       type="button"
                       className="account-signout"
                       role="menuitem"
-                      onClick={handleSignOut}
+                      onClick={() => void handleSignOut()}
                     >
                       <LogOut size={15} aria-hidden="true" />
                       退出登录
@@ -277,14 +323,14 @@ export function AppShell({
             ) : (
               <div
                 className="account-trigger account-readonly"
-                aria-label={`当前用户：${session.user.displayName}，${session.user.roleLabel}`}
+                aria-label={`当前用户：${activeSession.user.displayName}，${activeSession.user.roleLabel}`}
               >
                 <span className="account-avatar" aria-hidden="true">
                   {userInitial}
                 </span>
                 <span className="account-copy">
-                  <strong>{session.user.displayName}</strong>
-                  <small>{session.user.roleLabel}</small>
+                  <strong>{activeSession.user.displayName}</strong>
+                  <small>{activeSession.user.roleLabel}</small>
                 </span>
               </div>
             )}

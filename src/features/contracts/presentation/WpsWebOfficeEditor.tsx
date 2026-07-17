@@ -10,13 +10,15 @@ import type {
   ContractDocumentAnchor,
   ContractDocumentRevision,
   WpsContractEditorSession,
+  WpsEditorEvent,
+  WpsSaveResult,
 } from "../domain";
 import { WpsWebOfficeAdapter } from "../infrastructure";
 
 export interface WpsWebOfficeEditorHandle {
   locate(anchor: ContractDocumentAnchor): Promise<void>;
   applyRevision(revision: ContractDocumentRevision): Promise<void>;
-  save(): Promise<void>;
+  save(): Promise<WpsSaveResult>;
 }
 
 export interface WpsWebOfficeEditorProps {
@@ -24,13 +26,14 @@ export interface WpsWebOfficeEditorProps {
   readonly activeAnchor?: ContractDocumentAnchor;
   readonly onReadyChange?: (ready: boolean) => void;
   readonly onError?: (message: string) => void;
+  readonly onEvent?: (event: WpsEditorEvent) => void;
 }
 
 export const WpsWebOfficeEditor = forwardRef<
   WpsWebOfficeEditorHandle,
   WpsWebOfficeEditorProps
 >(function WpsWebOfficeEditor(
-  { session, activeAnchor, onReadyChange, onError },
+  { session, activeAnchor, onReadyChange, onError, onEvent },
   ref,
 ) {
   const mountRef = useRef<HTMLDivElement>(null);
@@ -44,6 +47,7 @@ export const WpsWebOfficeEditor = forwardRef<
     if (!mount) return;
     let active = true;
     const adapter = new WpsWebOfficeAdapter();
+    const removeEventListener = onEvent ? adapter.onEvent(onEvent) : undefined;
     adapterRef.current = adapter;
     setState("loading");
     setErrorMessage(null);
@@ -66,12 +70,13 @@ export const WpsWebOfficeEditor = forwardRef<
 
     return () => {
       active = false;
+      removeEventListener?.();
       adapter.destroy();
       adapterRef.current = null;
       mount.replaceChildren();
       onReadyChange?.(false);
     };
-  }, [attempt, onError, onReadyChange, session]);
+  }, [attempt, onError, onEvent, onReadyChange, session]);
 
   useEffect(() => {
     if (state !== "ready" || !activeAnchor) return;
@@ -97,7 +102,7 @@ export const WpsWebOfficeEditor = forwardRef<
       if (!adapterRef.current || state !== "ready") {
         throw new Error("在线编辑器尚未准备完成");
       }
-      await adapterRef.current.save();
+      return adapterRef.current.save();
     },
   }), [state]);
 

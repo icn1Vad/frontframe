@@ -6,7 +6,6 @@ import type {
   ContractRisk,
   CreateContractReviewTaskInput,
 } from "../domain";
-import { isContractEditorSession } from "../domain";
 
 const storageKey = "proofspace.contract-review.tasks.v3";
 
@@ -116,7 +115,15 @@ function readTasks(): ContractReviewTask[] {
     if (stored) {
       try {
         const parsed = JSON.parse(stored) as ContractReviewTask[];
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed)) {
+          return parsed.map((task) => ({
+            ...task,
+            documentId: task.documentId ?? `document-${task.id}`,
+            documentVersionId:
+              task.documentVersionId ?? `document-version-${task.id}-1`,
+            fileType: task.fileType ?? (/\.pdf$/i.test(task.name) ? "pdf" : "docx"),
+          }));
+        }
       } catch {
         window.localStorage.removeItem(storageKey);
       }
@@ -152,6 +159,9 @@ function createTaskRecord(
   return {
     id: input.id,
     version: 1,
+    documentId: `document-${input.id}`,
+    documentVersionId: `document-version-${input.id}-1`,
+    fileType: /\.pdf$/i.test(input.name) ? "pdf" : "docx",
     name: input.name,
     size: input.size,
     stance: input.stance,
@@ -217,24 +227,10 @@ export const mockContractReviewApi: ContractReviewApi = {
 
   async getEditorSession(taskId, options) {
     options?.signal?.throwIfAborted();
-    if (typeof window === "undefined") {
-      return { provider: "mock", reason: "在线编辑器仅在浏览器中初始化" };
-    }
-    try {
-      const response = await fetch(
-        `/api/contract-review/tasks/${encodeURIComponent(taskId)}/editor-session`,
-        { headers: { Accept: "application/json" }, signal: options?.signal },
-      );
-      if (!response.ok) {
-        return { provider: "mock", reason: `编辑器会话接口返回 ${response.status}` };
-      }
-      const session: unknown = await response.json();
-      return isContractEditorSession(session)
-        ? session
-        : { provider: "mock", reason: "编辑器会话配置无效" };
-    } catch {
-      return { provider: "mock", reason: "编辑器会话接口暂不可用" };
-    }
+    return {
+      provider: "mock",
+      reason: `任务 ${taskId} 当前使用文本预览；真实 WPS 会话必须由 Java 动态签发`,
+    };
   },
 
   async createTask(input, options) {

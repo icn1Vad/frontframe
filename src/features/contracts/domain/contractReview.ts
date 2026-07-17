@@ -20,6 +20,7 @@ export const contractReviewStanceLabels: Record<ContractReviewStance, string> = 
 };
 
 export type ContractReviewTaskStatus =
+  | "preview"
   | "queued"
   | "reviewing"
   | "reported"
@@ -55,6 +56,9 @@ export interface ContractRisk {
 export interface ContractReviewTask {
   readonly id: string;
   readonly version: number;
+  readonly documentId: string;
+  readonly documentVersionId: string;
+  readonly fileType: "docx" | "pdf";
   readonly name: string;
   readonly size: number;
   readonly stance: ContractReviewStance;

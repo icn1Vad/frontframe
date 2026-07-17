@@ -10,7 +10,8 @@ import type {
   AuthSession,
   LoginPayload,
   RegisterPayload,
-} from "../../features/auth";
+  RegisterResult,
+} from "../../features/auth/AuthApi";
 import type {
   ContractReviewApi,
   ContractMutationOptions,
@@ -128,7 +129,7 @@ export class AuthHttpAdapter implements AuthApi {
     return result;
   }
 
-  register(payload: RegisterPayload) {
+  async register(payload: RegisterPayload): Promise<RegisterResult> {
     return this.client.request("/auth/registrations", {
       method: "POST",
       body: payload,

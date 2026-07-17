@@ -1,6 +1,7 @@
 export * from "./ClassificationDocumentsTable";
 export * from "./documentActions";
 export * from "./DocumentDialogHost";
+export * from "./DocumentPreviewPane";
 export * from "./documentPresentation";
 export * from "./DocumentTableView";
 export * from "./FileClassificationScreen";

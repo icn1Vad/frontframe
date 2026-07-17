@@ -12,6 +12,32 @@ function jsonResponse(
 }
 
 describe("HttpClient", () => {
+  it("preserves the native fetch receiver in browser mode", async () => {
+    const nativeLikeFetch = vi.fn(function (
+      this: typeof globalThis,
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ) {
+      void input;
+      void init;
+      if (this !== globalThis) {
+        throw new TypeError("Illegal invocation");
+      }
+      return Promise.resolve(jsonResponse({ data: { ok: true } }));
+    });
+    vi.stubGlobal("fetch", nativeLikeFetch);
+    try {
+      const client = new HttpClient();
+
+      await expect(client.request("/receiver-check")).resolves.toEqual({
+        ok: true,
+      });
+      expect(nativeLikeFetch).toHaveBeenCalledOnce();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("uses cookie credentials, repeated query parameters and mutation headers", async () => {
     const fetchSpy = vi.fn(async (
       input: RequestInfo | URL,

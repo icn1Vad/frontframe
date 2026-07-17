@@ -30,6 +30,9 @@ const operatorLi = {
   displayName: "李四",
 } as const;
 
+const deletable = { canDelete: true } as const;
+const readOnly = { canDelete: false } as const;
+
 const classifiedContract = {
   id: createDocumentId("doc_xx_project_contract_v1"),
   name: "星河项目服务合同.pdf",
@@ -42,6 +45,7 @@ const classifiedContract = {
     publishedAt: createIsoDateTime("2026-07-05T10:30:00+08:00"),
   },
   operator: operatorZhang,
+  capabilities: deletable,
 } as const satisfies DocumentSummary;
 
 const reviewedPurchasePolicy = {
@@ -57,6 +61,7 @@ const reviewedPurchasePolicy = {
     publishedAt: createIsoDateTime("2026-07-05T14:40:00+08:00"),
   },
   operator: operatorZhang,
+  capabilities: deletable,
 } as const satisfies DocumentSummary;
 
 const classifiedRegulations = {
@@ -71,6 +76,7 @@ const classifiedRegulations = {
     publishedAt: createIsoDateTime("2026-07-04T10:18:00+08:00"),
   },
   operator: operatorZhang,
+  capabilities: deletable,
 } as const satisfies DocumentSummary;
 
 export const mockDocumentCollections = {
@@ -86,6 +92,7 @@ export const mockDocumentCollections = {
         queuedAt: createIsoDateTime("2026-07-05T10:24:00+08:00"),
       },
       operator: operatorZhang,
+      capabilities: deletable,
     },
     classifiedContract,
     {
@@ -101,6 +108,7 @@ export const mockDocumentCollections = {
         progress: createReviewProgress(0),
       },
       operator: operatorZhang,
+      capabilities: deletable,
     },
     {
       id: createDocumentId("doc_legacy_policy_v1"),
@@ -115,6 +123,7 @@ export const mockDocumentCollections = {
         reason: "user-action",
       },
       operator: operatorLi,
+      capabilities: readOnly,
     },
     classifiedRegulations,
   ],
@@ -132,6 +141,7 @@ export const mockDocumentCollections = {
         progress: createReviewProgress(30),
       },
       operator: operatorZhang,
+      capabilities: readOnly,
     },
     {
       id: createDocumentId("doc_supplier_policy_v1"),
@@ -145,6 +155,7 @@ export const mockDocumentCollections = {
         reviewedAt: createIsoDateTime("2026-07-05T12:08:00+08:00"),
       },
       operator: operatorZhang,
+      capabilities: readOnly,
     },
     {
       id: createDocumentId("doc_xx_project_contract_review_v2"),
@@ -159,6 +170,7 @@ export const mockDocumentCollections = {
         publishedAt: createIsoDateTime("2026-07-04T18:20:00+08:00"),
       },
       operator: operatorZhang,
+      capabilities: readOnly,
     },
     {
       id: createDocumentId("doc_legacy_policy_review_v2"),
@@ -174,6 +186,7 @@ export const mockDocumentCollections = {
         reason: "user-action",
       },
       operator: operatorZhang,
+      capabilities: readOnly,
     },
     reviewedPurchasePolicy,
   ],

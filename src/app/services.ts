@@ -1,5 +1,5 @@
-import type { AuthApi } from "../features/auth";
-import { mockAuthApi } from "../features/auth";
+import type { AuthApi } from "../features/auth/AuthApi";
+import { mockAuthApi } from "../features/auth/mockAuthApi";
 import type { ContractReviewApi } from "../features/contracts/application";
 import { mockContractReviewApi } from "../features/contracts/infrastructure";
 import type {
@@ -22,6 +22,7 @@ import {
   createIsoDateTime,
   createUserId,
 } from "../features/documents/domain";
+import type { AiResultSource } from "../shared/lib/aiResultSource";
 
 export interface DashboardOverview {
   readonly metrics: readonly {
@@ -40,13 +41,22 @@ export interface ChatCitation {
   readonly excerpt: string;
 }
 
-export interface ChatMessage {
+interface ChatMessageBase {
   readonly id: string;
-  readonly role: "user" | "assistant";
   readonly content: string;
   readonly createdAt: string;
   readonly citations: readonly ChatCitation[];
 }
+
+export type ChatMessage =
+  | (ChatMessageBase & {
+      readonly role: "user";
+      readonly source?: never;
+    })
+  | (ChatMessageBase & {
+      readonly role: "assistant";
+      readonly source: AiResultSource;
+    });
 
 export interface ChatConversation {
   readonly id: string;
@@ -109,6 +119,7 @@ const contractReview: ContractReviewApi = {
         id: createUserId("user_zhang_san"),
         displayName: "张三",
       },
+      capabilities: { canDelete: true },
     });
     return task;
   },
@@ -213,6 +224,7 @@ const chat: ChatApi = {
     const assistantMessage: ChatMessage = {
       id: `message-assistant-${Date.now()}`,
       role: "assistant",
+      source: "STUB",
       content: citations.length
         ? `已结合 ${citations.length} 份正式入库文件分析：${normalizedQuestion}`
         : "当前知识库暂无可引用文件，请先完成文件入库。",
