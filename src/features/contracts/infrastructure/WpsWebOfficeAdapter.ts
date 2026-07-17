@@ -147,6 +147,11 @@ function classifyEditorError(value: unknown, fallback: WpsEditorErrorCode): WpsE
   return fallback;
 }
 
+function validWpsEndpoint(value: string | undefined): string | undefined {
+  const endpoint = value?.trim();
+  return endpoint && /^https?:\/\//i.test(endpoint) ? endpoint : undefined;
+}
+
 function parseSaveResult(value: unknown): WpsSaveResult {
   if (!value || typeof value !== "object") return { status: "fail" };
   const candidate = value as Record<string, unknown>;
@@ -217,6 +222,7 @@ export class WpsWebOfficeAdapter {
       const refreshToken = session.refreshTokenUrl
         ? () => refreshWpsToken(session.refreshTokenUrl!)
         : undefined;
+      const endpoint = validWpsEndpoint(session.endpoint);
       const instance = sdk.init({
         officeType: sdk.OfficeType.Writer,
         appId: session.appId,
@@ -224,7 +230,7 @@ export class WpsWebOfficeAdapter {
         mount: container,
         token: session.token,
         refreshToken,
-        endpoint: session.endpoint,
+        ...(endpoint ? { endpoint } : {}),
         customArgs: {
           ...session.customArgs,
           taskId: session.taskId,

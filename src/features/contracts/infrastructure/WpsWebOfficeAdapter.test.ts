@@ -85,6 +85,20 @@ describe("WpsWebOfficeAdapter", () => {
     expect(events).toContain("save-failed");
   });
 
+  it("omits invalid endpoint values so the official SDK can use its default", async () => {
+    const fixture = createSdk({ result: "nochange" });
+    const adapter = new WpsWebOfficeAdapter(async () => fixture.sdk);
+
+    await adapter.mount({} as HTMLElement, {
+      ...session,
+      endpoint: "undefined",
+    });
+
+    expect(fixture.sdk.init).toHaveBeenCalledWith(
+      expect.not.objectContaining({ endpoint: expect.anything() }),
+    );
+  });
+
   it("blocks anchors from a different document version", async () => {
     const fixture = createSdk({ result: "nochange" });
     const adapter = new WpsWebOfficeAdapter(async () => fixture.sdk);
