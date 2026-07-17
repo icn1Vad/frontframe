@@ -42,7 +42,7 @@ export function Navbar() {
           className="h-10 px-4 text-xs md:h-11 md:px-5 md:text-sm"
           href="#experience"
         >
-          开始体验
+          登录/注册
         </CTAButton>
       </nav>
     </motion.header>

@@ -78,6 +78,7 @@ const ClassificationTasks: AppPage<ClassificationTasksProps> =
                   mutationOptions("start-review"),
                 ),
               );
+              await router.push(routes.reviewTasks);
             },
           }}
           onDelete={async (documentId: DocumentId) => {

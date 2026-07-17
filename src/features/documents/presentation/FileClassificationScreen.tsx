@@ -50,7 +50,6 @@ import {
   documentTypeLabels,
 } from "./documentPresentation";
 
-type Stage = "empty" | "pending" | "confirm";
 export type CandidateState = ClassificationCandidateState;
 export type ClassificationCandidate = ClassificationCandidateRecord;
 export type CandidateSaveState = "clean" | "dirty" | "saving" | "error";
@@ -74,20 +73,18 @@ export interface FileClassificationScreenProps {
 }
 
 type DialogState =
-  | { readonly kind: "preview"; readonly entityId: string }
+  | { readonly kind: "upload" }
+  | {
+      readonly kind: "preview";
+      readonly entityId: string;
+      readonly returnToUpload?: boolean;
+    }
   | { readonly kind: "bulk-confirm" }
   | {
       readonly kind: "delete";
       readonly candidateIds: readonly ClassificationCandidateId[];
     }
   | null;
-
-const initialFiles: readonly UploadFile[] = [
-  { id: "upload_purchase_policy", name: "采购管理办法.docx", metadata: "文字文档 · 1.2 兆字节" },
-  { id: "upload_project_contract", name: "星河项目服务合同.pdf", metadata: "便携文档 · 3.4 兆字节" },
-  { id: "upload_compliance_report", name: "年度合规报告.pdf", metadata: "便携文档 · 2.8 兆字节" },
-  { id: "upload_supplier_note", name: "供应商说明.txt", metadata: "纯文本 · 36 千字节" },
-];
 
 const emptyStats: ClassificationCandidateStats = {
   total: 0,
@@ -167,9 +164,8 @@ export function FileClassificationScreen({ api }: FileClassificationScreenProps)
   const fileInputRef = useRef<HTMLInputElement>(null);
   const selectAllRef = useRef<HTMLInputElement>(null);
   const initializedFromUrl = useRef(false);
-  const [stage, setStage] = useState<Stage>("empty");
   const [dialog, setDialog] = useState<DialogState>(null);
-  const [files, setFiles] = useState<readonly UploadFile[]>(initialFiles);
+  const [files, setFiles] = useState<readonly UploadFile[]>([]);
   const [result, setResult] =
     useState<PageResult<ClassificationCandidateRecord>>(emptyResult);
   const [stats, setStats] = useState<ClassificationCandidateStats>(emptyStats);
@@ -244,6 +240,7 @@ export function FileClassificationScreen({ api }: FileClassificationScreenProps)
 
   useEffect(() => {
     if (!feedback) return;
+    if (feedback.includes("分类任务池")) return;
     const timeoutId = window.setTimeout(() => setFeedback(null), 3200);
     return () => window.clearTimeout(timeoutId);
   }, [feedback]);
@@ -379,7 +376,9 @@ export function FileClassificationScreen({ api }: FileClassificationScreenProps)
       await refreshStats();
       setFeedback(
         response.failed.length
-          ? `已确认 ${response.succeeded.length} 项，${response.failed.length} 项失败并保留在列表中`
+          ? response.succeeded.length > 0
+            ? `已确认 ${response.succeeded.length} 项并移入分类任务池，${response.failed.length} 项失败并保留在当前列表中`
+            : `${response.failed.length} 项确认失败并保留在当前列表中`
           : `已确认 ${response.succeeded.length} 项并移入分类任务池`,
       );
     } catch (error) {
@@ -448,7 +447,7 @@ export function FileClassificationScreen({ api }: FileClassificationScreenProps)
     }));
     if (additions.length === 0) return;
     setFiles((current) => [...current, ...additions]);
-    setStage("pending");
+    setDialog({ kind: "upload" });
     setFeedback(`已添加 ${additions.length} 个文件到待上传列表`);
   };
 
@@ -483,7 +482,7 @@ export function FileClassificationScreen({ api }: FileClassificationScreenProps)
         });
       }
       setFiles([]);
-      setStage("confirm");
+      setDialog(null);
       setPage(1);
       await loadCandidates();
       setFeedback("文件已提交，正在进行智能分类");
@@ -526,143 +525,32 @@ export function FileClassificationScreen({ api }: FileClassificationScreenProps)
     }
   };
 
+  const showClassificationPoolAction = feedback?.includes("分类任务池") ?? false;
   const feedbackNode = (
     <div className="action-feedback-slot" role="status" aria-live="polite">
       {feedback ? (
-        <span
+        <div
           className={`action-feedback${feedback.includes("失败") ? " error" : ""}${
-            feedback.includes("分类任务池") ? " classification-pool-feedback" : ""
+            showClassificationPoolAction ? " classification-pool-feedback" : ""
           }`}
         >
-          {feedback.includes("分类任务池") ? (
+          {showClassificationPoolAction ? (
             <CheckCircle2 aria-hidden="true" />
           ) : null}
           <span>{feedback}</span>
-        </span>
+          {showClassificationPoolAction ? (
+            <button
+              type="button"
+              className="classification-pool-link"
+              onClick={() => void router.push(routes.classificationTasks)}
+            >
+              查看分类任务池
+            </button>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );
-
-  const fileInput = (
-    <input
-      ref={fileInputRef}
-      className="visually-hidden"
-      type="file"
-      accept=".pdf,.docx,.xlsx,.txt"
-      multiple
-      onChange={handleFileInput}
-    />
-  );
-
-  if (stage === "empty") {
-    return (
-      <PageStack>
-        <Surface className="upload-panel">
-          <h2>上传待分类文件</h2>
-          <p>系统会生成推荐类型、推荐分类、文件层级和人工确认状态。</p>
-          {fileInput}
-          <button
-            className={`dropzone${isDragging ? " dragging" : ""}`}
-            type="button"
-            onClick={() => setStage("pending")}
-            onDragEnter={handleDragOver}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-          >
-            <span className="plus-circle"><Plus /></span>
-            <strong>拖拽文件到这里，或点击查看待上传文件</strong>
-            <small>支持便携文档、文字文档、表格文档和纯文本，最大 50 兆字节</small>
-            <span className="secondary">进入上传区</span>
-          </button>
-        </Surface>
-        {feedbackNode}
-      </PageStack>
-    );
-  }
-
-  if (stage === "pending") {
-    return (
-      <PageStack>
-        <Surface className="pending-panel">
-          <h2>待上传文件</h2>
-          <p>文件尚未提交；确认上传后进入分类，并等待人工确认。</p>
-          {fileInput}
-          <div className="pending-grid">
-            <button
-              className={`pending-drop${isDragging ? " dragging" : ""}`}
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              onDragEnter={handleDragOver}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-            >
-              <span className="plus-circle"><Plus /></span>
-              <strong>继续拖拽文件到这里</strong>
-              <small>支持便携文档、文字文档、表格文档和纯文本，最大 50 兆字节</small>
-              <span className="secondary">继续添加文件</span>
-            </button>
-            <div className="pending-list">
-              <div className="pending-head">
-                <span>文件名</span><span>大小 / 类型</span><span>状态</span><span>操作</span>
-              </div>
-              {files.length === 0 ? <p className="table-empty">尚未选择文件</p> : null}
-              {files.map((file) => (
-                <div className="pending-row" key={file.id}>
-                  <span><FileText size={17} />{file.name}</span>
-                  <span>{file.metadata}</span>
-                  <Status>待上传</Status>
-                  <span className="actions touch-actions">
-                    <IconButton
-                      label={`预览 ${file.name}`}
-                      onClick={() => setDialog({ kind: "preview", entityId: file.id })}
-                    >
-                      <Eye />
-                    </IconButton>
-                    <IconButton
-                      label={`删除 ${file.name}`}
-                      danger
-                      onClick={() => {
-                        setFiles((current) => current.filter((item) => item.id !== file.id));
-                        setFeedback("文件已移除");
-                      }}
-                    >
-                      <Trash2 />
-                    </IconButton>
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="pending-footer">
-            <p>上传前可预览并删除错误文件；不会影响已进入分类流程的文件。</p>
-            <button
-              className="secondary"
-              type="button"
-              disabled={files.length === 0 || uploading}
-              onClick={() => setFiles([])}
-            >
-              删除全部
-            </button>
-            <button
-              className="primary"
-              type="button"
-              disabled={files.length === 0 || uploading}
-              onClick={() => void confirmPendingUpload()}
-            >
-              {uploading ? <span className="button-spinner" aria-hidden="true" /> : null}
-              {uploading ? "上传中…" : "确认上传"}
-            </button>
-          </div>
-        </Surface>
-        {feedbackNode}
-        {dialog?.kind === "preview" ? (
-          <PreviewModal name={previewName} onClose={() => setDialog(null)} />
-        ) : null}
-      </PageStack>
-    );
-  }
 
   const classifyingSelected = selectedCandidates.filter(
     (candidate) => candidate.state === "classifying",
@@ -679,8 +567,8 @@ export function FileClassificationScreen({ api }: FileClassificationScreenProps)
             <h2 id="classification-heading">分类确认</h2>
             <p>四项推荐结果均可修改；确认后人工结果生效并进入分类任务池。</p>
           </div>
-          <button className="secondary" type="button" onClick={() => setStage("pending")}>
-            继续上传
+          <button className="primary" type="button" onClick={() => setDialog({ kind: "upload" })}>
+            <Plus size={15} />继续上传
           </button>
         </PageToolbar>
         <StatGrid className="stats-row">
@@ -831,12 +719,105 @@ export function FileClassificationScreen({ api }: FileClassificationScreenProps)
       </section>
       {feedbackNode}
 
+      {dialog?.kind === "upload" ? (
+        <Modal
+          className="upload-files-modal"
+          title="继续上传文件"
+          subtitle="文件提交后会直接进入当前分类确认列表，不会离开本页面。"
+          onClose={() => setDialog(null)}
+        >
+          <input
+            ref={fileInputRef}
+            className="visually-hidden"
+            type="file"
+            accept=".pdf,.docx,.xlsx,.txt"
+            multiple
+            onChange={handleFileInput}
+          />
+          <button
+            className={`upload-modal-drop${isDragging ? " dragging" : ""}`}
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            onDragEnter={handleDragOver}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            <span className="plus-circle"><Plus /></span>
+            <span>
+              <strong>拖拽文件到这里，或点击选择文件</strong>
+              <small>支持便携文档、文字文档、表格文档和纯文本，单个文件最大 50 兆字节</small>
+            </span>
+            <span className="secondary">选择文件</span>
+          </button>
+          <div className="upload-modal-file-list" aria-label="待上传文件">
+            {files.length === 0 ? (
+              <p className="upload-modal-empty">尚未选择文件</p>
+            ) : (
+              files.map((file) => (
+                <div className="upload-modal-file" key={file.id}>
+                  <span className="upload-modal-file-copy">
+                    <FileText size={17} />
+                    <span><strong>{file.name}</strong><small>{file.metadata}</small></span>
+                  </span>
+                  <Status>待上传</Status>
+                  <span className="actions touch-actions">
+                    <IconButton
+                      label={`预览 ${file.name}`}
+                      onClick={() => {
+                        setCandidatePreview(null);
+                        setDialog({
+                          kind: "preview",
+                          entityId: file.id,
+                          returnToUpload: true,
+                        });
+                      }}
+                    >
+                      <Eye />
+                    </IconButton>
+                    <IconButton
+                      label={`删除 ${file.name}`}
+                      danger
+                      onClick={() => {
+                        setFiles((current) => current.filter((item) => item.id !== file.id));
+                        setFeedback("文件已从待上传列表移除");
+                      }}
+                    >
+                      <Trash2 />
+                    </IconButton>
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+          <div className="modal-actions upload-modal-actions">
+            <span>共 {files.length} 个待上传文件</span>
+            <button
+              className="secondary"
+              type="button"
+              disabled={files.length === 0 || uploading}
+              onClick={() => setFiles([])}
+            >
+              清空列表
+            </button>
+            <button
+              className="primary"
+              type="button"
+              disabled={files.length === 0 || uploading}
+              onClick={() => void confirmPendingUpload()}
+            >
+              {uploading ? <span className="button-spinner" aria-hidden="true" /> : null}
+              {uploading ? "上传中…" : "确认上传"}
+            </button>
+          </div>
+        </Modal>
+      ) : null}
       {dialog?.kind === "preview" ? (
         <PreviewModal
           name={candidatePreview?.documentName ?? previewName}
           content={candidatePreview?.content}
           loading={previewLoading}
-          onClose={() => setDialog(null)}
+          onClose={() => setDialog(dialog.returnToUpload ? { kind: "upload" } : null)}
         />
       ) : null}
       {dialog?.kind === "bulk-confirm" ? (

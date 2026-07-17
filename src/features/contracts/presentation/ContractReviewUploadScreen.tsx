@@ -86,7 +86,7 @@ export function ContractReviewUploadScreen({
     setSubmitting(true);
     setFeedback(null);
     try {
-      await api.createTask({
+      const createdTask = await api.createTask({
         file: pendingFile.file,
         name: name.trim(),
         size: pendingFile.size,
@@ -95,7 +95,11 @@ export function ContractReviewUploadScreen({
       }, {
         idempotencyKey: createIdempotencyKey("create-contract-review"),
       });
-      await router.push(routes.contractReviewTasks);
+      await api.startReview(createdTask.id, {
+        idempotencyKey: createIdempotencyKey("start-contract-review"),
+        expectedVersion: createdTask.version,
+      });
+      await router.push(routes.contractReviewTask(createdTask.id));
     } catch (error) {
       setFeedback(
         error instanceof Error ? `创建审查任务失败：${error.message}` : "创建审查任务失败，请稍后重试",
@@ -146,7 +150,7 @@ export function ContractReviewUploadScreen({
           </button>
           <div className="contract-upload-note">
             <Settings2 size={16} />
-            <span>上传后可修改文件名称、审查偏向和检查模块，确认后直接进入合同审查任务池。</span>
+            <span>上传后可修改文件名称、审查偏向和检查模块，开始审查后直接进入合同审查工作台。</span>
           </div>
         </Surface>
         {feedback ? <p className="action-feedback error">{feedback}</p> : null}
@@ -160,7 +164,7 @@ export function ContractReviewUploadScreen({
         <div>
           <div className="contract-eyebrow">合同专项审查配置</div>
           <h2>确认合同审查配置</h2>
-          <p>确认后直接创建条款级合同审查任务，不经过文件分类任务池。</p>
+          <p>开始后直接创建条款级合同审查任务并进入审查工作台，不经过文件分类任务池。</p>
         </div>
         <button
           type="button"
@@ -237,7 +241,7 @@ export function ContractReviewUploadScreen({
           </aside>
         </div>
         <div className="contract-confirm-footer">
-          <p>{feedback ?? `已选择 ${modules.length} 个检查模块，确认后进入审查任务池。`}</p>
+          <p>{feedback ?? `已选择 ${modules.length} 个检查模块，开始后直接进入审查工作台。`}</p>
           <button
             type="button"
             className="primary"
@@ -245,7 +249,7 @@ export function ContractReviewUploadScreen({
             onClick={() => void confirmTask()}
           >
             {submitting ? <span className="button-spinner" aria-hidden="true" /> : <Plus size={15} />}
-            {submitting ? "创建任务中" : "确认并进入任务池"}
+            {submitting ? "正在开始审查" : "开始审查"}
           </button>
         </div>
       </Surface>
