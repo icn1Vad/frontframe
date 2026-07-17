@@ -111,12 +111,15 @@ export class WpsWebOfficeAdapter {
       ? () => refreshWpsToken(session.refreshTokenUrl!)
       : undefined;
     const endpoint = session.endpoint?.trim();
+    const initialToken = typeof session.token === "string"
+      ? session.token
+      : session.token?.token;
     const instance = sdk.init({
       officeType: sdk.OfficeType.Writer,
       appId: session.appId,
       fileId: session.fileId,
       mount: container,
-      token: session.token,
+      ...(initialToken ? { token: initialToken } : {}),
       refreshToken,
       ...(endpoint && /^https?:\/\//i.test(endpoint) ? { endpoint } : {}),
       customArgs: {

@@ -350,7 +350,7 @@ export function ContractReviewWorkbenchScreen({
         <section className="contract-progress-panel contract-wps-phase-note">
           <div>
             <strong>真实 DOCX 在线编辑验证</strong>
-            <span>本阶段只验证 WPS 打开和输入修改；智能审查、风险处理、报告和正式版本保存暂未接入。</span>
+            <span>演示模式只验证 WPS 打开和输入修改；当前修改不生成正式版本，刷新后不保证保留。</span>
           </div>
         </section>
       ) : !reportGenerated ? (

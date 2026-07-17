@@ -6,7 +6,16 @@ const nextConfig = {
   output: "standalone",
   reactStrictMode: true,
   async rewrites() {
-    const rules = [];
+    const rules = [
+      {
+        source: "/v3/3rd/:path*",
+        destination: "/api/wps-demo/:path*",
+      },
+      {
+        source: "/proofspace/v3/3rd/:path*",
+        destination: "/api/wps-demo/:path*",
+      },
+    ];
     if (apiBackendOrigin) {
       rules.push({
         source: "/api/v1/:path*",

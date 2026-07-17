@@ -14,13 +14,10 @@ import {
   MockKnowledgeApi,
   mockDocumentRepository,
 } from "../features/documents/infrastructure";
+import { mockContractReviewApi } from "../features/contracts/infrastructure";
 import { ContinewAuthApi } from "../infrastructure/http/ContinewAuthApi";
 import { BusinessChatApi } from "../infrastructure/http/BusinessChatApi";
 import { BusinessReviewApi } from "../infrastructure/http/BusinessReviewApi";
-import {
-  AuthHttpAdapter,
-  ContractReviewHttpAdapter,
-} from "../infrastructure/http/adapters";
 import { HttpClient } from "../infrastructure/http/HttpClient";
 import { clearAccessToken, getAccessToken } from "../shared/lib/accessToken";
 
@@ -118,12 +115,13 @@ const classificationTasks = new MockClassificationTaskPoolApi(
 );
 const reviewTasks = businessReview;
 const knowledge = new MockKnowledgeApi(mockDocumentRepository);
+/*
 const contractClient = new HttpClient({
   baseUrl: "/proofspace-api/api/v1",
 });
 const contractReviewAdapter = new ContractReviewHttpAdapter(contractClient);
 
-/** ProofSpace uses an HttpOnly session cookie independently from ContiNew auth. */
+// Legacy ProofSpace business adapter intentionally disconnected in WPS demo mode.
 export const contractReviewAuth: AuthApi = new AuthHttpAdapter(contractClient);
 
 function unavailableContractFeature(): never {
@@ -149,6 +147,10 @@ const contractReview: ContractReviewApi = {
     return unavailableContractFeature();
   },
 };
+*/
+
+/** Contract/WPS demo stays independent from ContiNew and ProofSpace business APIs. */
+const contractReview: ContractReviewApi = mockContractReviewApi;
 
 const dashboard: DashboardApi = {
   async getOverview() {

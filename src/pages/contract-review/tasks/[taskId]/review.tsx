@@ -1,14 +1,6 @@
 import { useRouter } from "next/router";
-import {
-  appServices,
-  contractReviewAuth,
-  definePageConfig,
-  type AppPage,
-} from "../../../../app";
-import {
-  ContractReviewWorkbenchScreen,
-  ContractWorkspaceGate,
-} from "../../../../features/contracts";
+import { appServices, definePageConfig, type AppPage } from "../../../../app";
+import { ContractReviewWorkbenchScreen } from "../../../../features/contracts";
 
 const ContractReviewWorkbench: AppPage = function ContractReviewWorkbench() {
   const router = useRouter();
@@ -16,11 +8,7 @@ const ContractReviewWorkbench: AppPage = function ContractReviewWorkbench() {
   const taskId = Array.isArray(rawTaskId) ? rawTaskId[0] : rawTaskId;
 
   if (!taskId) return null;
-  return (
-    <ContractWorkspaceGate auth={contractReviewAuth}>
-      <ContractReviewWorkbenchScreen taskId={taskId} api={appServices.contractReview} />
-    </ContractWorkspaceGate>
-  );
+  return <ContractReviewWorkbenchScreen taskId={taskId} api={appServices.contractReview} />;
 };
 
 ContractReviewWorkbench.pageConfig = definePageConfig({
