@@ -4,6 +4,15 @@ export type RequestedRole = "user" | "admin";
 export interface LoginPayload {
   readonly username: string;
   readonly password: string;
+  readonly captcha?: string;
+  readonly uuid?: string;
+}
+
+export interface LoginCaptcha {
+  readonly uuid: string;
+  readonly img: string;
+  readonly expireTime: number;
+  readonly isEnabled: boolean;
 }
 
 export interface AuthUser {
@@ -29,7 +38,7 @@ export interface RegisterPayload {
 export interface LoginResult {
   readonly status: "authenticated";
   readonly message: string;
-  readonly session: AuthSession;
+  readonly session?: AuthSession;
 }
 
 export interface RegisterResult {
@@ -38,6 +47,7 @@ export interface RegisterResult {
 }
 
 export interface AuthApi {
+  getCaptcha?(): Promise<LoginCaptcha>;
   login(payload: LoginPayload): Promise<LoginResult>;
   register(payload: RegisterPayload): Promise<RegisterResult>;
   getSession(): Promise<AuthSession | null>;

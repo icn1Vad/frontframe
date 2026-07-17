@@ -124,7 +124,7 @@ export class AuthHttpAdapter implements AuthApi {
       body: payload,
       decode: decodeLoginResult,
     });
-    this.client.setCsrfToken(result.session.csrfToken);
+    this.client.setCsrfToken(result.session?.csrfToken);
     return result;
   }
 

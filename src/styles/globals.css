@@ -1138,6 +1138,36 @@ button:disabled { cursor: not-allowed; }
   box-shadow: 0 0 0 3px rgba(199, 95, 67, .11);
 }
 .landing-auth-card label small { margin-top: -2px; color: #80786f; font-size: 11px; font-weight: 400; }
+.landing-captcha-error {
+  margin: 0 0 14px;
+  color: #a73d31;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.landing-captcha-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 132px;
+  gap: 10px;
+}
+.landing-captcha-image {
+  height: 48px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  color: var(--landing-muted);
+  background: rgba(255, 252, 246, .76);
+  border: 1px solid rgba(199, 184, 166, .86);
+  border-radius: 9px;
+  font-size: 12px;
+}
+.landing-captcha-image:not(:disabled):hover { border-color: var(--landing-copper); }
+.landing-captcha-image:disabled { opacity: .6; }
+.landing-captcha-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
 .landing-auth-submit {
   width: 100%;
   height: 50px;

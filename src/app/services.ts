@@ -1,5 +1,4 @@
 import type { AuthApi } from "../features/auth";
-import { mockAuthApi } from "../features/auth";
 import type { ContractReviewApi } from "../features/contracts/application";
 import { mockContractReviewApi } from "../features/contracts/infrastructure";
 import type {
@@ -14,7 +13,6 @@ import {
   MockClassificationTaskPoolApi,
   MockClassificationWorkflowApi,
   MockKnowledgeApi,
-  MockReviewTaskPoolApi,
   mockDocumentRepository,
 } from "../features/documents/infrastructure";
 import {
@@ -22,6 +20,11 @@ import {
   createIsoDateTime,
   createUserId,
 } from "../features/documents/domain";
+import { ContinewAuthApi } from "../infrastructure/http/ContinewAuthApi";
+import { BusinessChatApi } from "../infrastructure/http/BusinessChatApi";
+import { BusinessReviewApi } from "../infrastructure/http/BusinessReviewApi";
+import { HttpClient } from "../infrastructure/http/HttpClient";
+import { clearAccessToken, getAccessToken } from "../shared/lib/accessToken";
 
 export interface DashboardOverview {
   readonly metrics: readonly {
@@ -37,7 +40,18 @@ export interface DashboardApi {
 export interface ChatCitation {
   readonly documentId: string;
   readonly documentName: string;
+  readonly location?: string;
   readonly excerpt: string;
+}
+
+export interface ChatStreamHandlers {
+  readonly onMeta?: (meta: {
+    readonly requestId: string;
+    readonly conversationId: string;
+    readonly messageId: string;
+  }) => void;
+  readonly onDelta?: (content: string) => void;
+  readonly onCitation?: (citation: ChatCitation) => void;
 }
 
 export interface ChatMessage {
@@ -67,7 +81,7 @@ export interface ChatApi {
   sendMessage(
     conversationId: string,
     question: string,
-    options: MutationOptions,
+    options: MutationOptions & ChatStreamHandlers,
   ): Promise<ChatMessage>;
 }
 
@@ -83,9 +97,28 @@ export interface AppServices {
   readonly chat: ChatApi;
 }
 
-const classification = new MockClassificationWorkflowApi(mockDocumentRepository);
-const classificationTasks = new MockClassificationTaskPoolApi(mockDocumentRepository);
-const reviewTasks = new MockReviewTaskPoolApi(mockDocumentRepository);
+const auth: AuthApi = new ContinewAuthApi(new HttpClient({
+  baseUrl: "",
+  onUnauthorized: clearAccessToken,
+}));
+
+const businessClient = new HttpClient({
+  baseUrl: "",
+  getAccessToken,
+  onUnauthorized: clearAccessToken,
+});
+const businessReview = new BusinessReviewApi(businessClient);
+
+const classification = new MockClassificationWorkflowApi(
+  mockDocumentRepository,
+  [],
+  (file, idempotencyKey, signal) => businessReview.uploadPolicy(file, idempotencyKey, signal),
+);
+const classificationTasks = new MockClassificationTaskPoolApi(
+  mockDocumentRepository,
+  (fileId, idempotencyKey, signal) => businessReview.createTask(fileId, idempotencyKey, signal),
+);
+const reviewTasks = businessReview;
 const knowledge = new MockKnowledgeApi(mockDocumentRepository);
 const contractReviewAdapter = mockContractReviewApi;
 
@@ -106,8 +139,8 @@ const contractReview: ContractReviewApi = {
         publishedAt: createIsoDateTime(new Date().toISOString()),
       },
       operator: {
-        id: createUserId("user_zhang_san"),
-        displayName: "张三",
+        id: createUserId("current_user"),
+        displayName: "当前用户",
       },
     });
     return task;
@@ -118,129 +151,20 @@ const dashboard: DashboardApi = {
   async getOverview() {
     return {
       metrics: [
-        { label: "已入库制度", value: "1,284" },
-        { label: "已入库合同", value: "8,426" },
-        { label: "已入库报告", value: "326" },
-        { label: "已入库其他文件", value: "674" },
+        { label: "已入库制度", value: "0" },
+        { label: "已入库合同", value: "0" },
+        { label: "已入库报告", value: "0" },
+        { label: "已入库其他文件", value: "0" },
       ],
     };
   },
 };
 
-const chatStorageKey = "proofspace.chat.v1";
-const initialChatTime = "2026-07-15T09:00:00.000Z";
-let conversations: ChatConversation[] = [
-  {
-    id: "investment-approval",
-    title: "投资审批权限校验",
-    createdAt: initialChatTime,
-    updatedAt: initialChatTime,
-    messages: [],
-  },
-];
-
-function readConversations(): ChatConversation[] {
-  if (typeof window === "undefined") return conversations;
-  const stored = window.localStorage.getItem(chatStorageKey);
-  if (!stored) return conversations;
-  try {
-    const parsed = JSON.parse(stored) as ChatConversation[];
-    return Array.isArray(parsed) ? parsed : conversations;
-  } catch {
-    window.localStorage.removeItem(chatStorageKey);
-    return conversations;
-  }
-}
-
-function writeConversations(next: readonly ChatConversation[]): void {
-  conversations = next.map((conversation) => ({
-    ...conversation,
-    messages: [...conversation.messages],
-  }));
-  if (typeof window !== "undefined") {
-    window.localStorage.setItem(chatStorageKey, JSON.stringify(conversations));
-  }
-}
-
-const chat: ChatApi = {
-  async listConversations() {
-    return readConversations()
-      .slice()
-      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
-  },
-  async getConversation(id) {
-    return readConversations().find((item) => item.id === id);
-  },
-  async createConversation(title) {
-    const timestamp = new Date().toISOString();
-    const conversation: ChatConversation = {
-      id: `conversation-${Date.now()}`,
-      title: title?.trim() || "新建提问集",
-      createdAt: timestamp,
-      updatedAt: timestamp,
-      messages: [],
-    };
-    writeConversations([conversation, ...readConversations()]);
-    return conversation;
-  },
-  async deleteConversation(id) {
-    writeConversations(readConversations().filter((item) => item.id !== id));
-  },
-  async sendMessage(conversationId, question) {
-    const normalizedQuestion = question.trim();
-    if (!normalizedQuestion) throw new Error("问题不能为空");
-    const current = readConversations();
-    const conversation = current.find((item) => item.id === conversationId);
-    if (!conversation) throw new Error("提问集不存在");
-    const timestamp = new Date().toISOString();
-    const userMessage: ChatMessage = {
-      id: `message-user-${Date.now()}`,
-      role: "user",
-      content: normalizedQuestion,
-      createdAt: timestamp,
-      citations: [],
-    };
-    const knowledgeResult = await knowledge.list({
-      page: 1,
-      pageSize: 2,
-      sort: { by: "updatedAt", direction: "desc" },
-    });
-    const citations = knowledgeResult.items.map<ChatCitation>((document) => ({
-      documentId: document.id,
-      documentName: document.name,
-      excerpt: `依据“${document.name}”中的正式入库内容进行回答。`,
-    }));
-    const assistantMessage: ChatMessage = {
-      id: `message-assistant-${Date.now()}`,
-      role: "assistant",
-      content: citations.length
-        ? `已结合 ${citations.length} 份正式入库文件分析：${normalizedQuestion}`
-        : "当前知识库暂无可引用文件，请先完成文件入库。",
-      createdAt: new Date().toISOString(),
-      citations,
-    };
-    writeConversations(
-      current.map((item) =>
-        item.id === conversationId
-          ? {
-              ...item,
-              title:
-                item.messages.length === 0
-                  ? normalizedQuestion.slice(0, 18)
-                  : item.title,
-              updatedAt: assistantMessage.createdAt,
-              messages: [...item.messages, userMessage, assistantMessage],
-            }
-          : item,
-      ),
-    );
-    return assistantMessage;
-  },
-};
+const chat: ChatApi = new BusinessChatApi(getAccessToken, clearAccessToken, businessClient);
 
 /** Application composition root. Swap adapters here, not inside pages or UI. */
 export const appServices: AppServices = Object.freeze({
-  auth: mockAuthApi,
+  auth,
   dashboard,
   classification,
   classificationTasks,

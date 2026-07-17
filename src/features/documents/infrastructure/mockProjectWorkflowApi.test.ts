@@ -128,7 +128,7 @@ describe("task pool deletion semantics", () => {
     expect(report?.termination).toMatchObject({
       progress: 30,
       discoveredRiskCount: 2,
-      operator: "张三",
+      operator: "当前用户",
     });
   });
 

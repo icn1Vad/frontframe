@@ -2,6 +2,7 @@ import { BookOpen, Plus, Send, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import type {
   ChatApi,
+  ChatCitation,
   ChatConversation,
 } from "../../app/services";
 import { createIdempotencyKey } from "../../shared/lib/idempotency";
@@ -19,6 +20,10 @@ export function ChatScreen({ api }: ChatScreenProps) {
   const [question, setQuestion] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
+  const [pendingQuestion, setPendingQuestion] = useState<string | null>(null);
+  const [streamedContent, setStreamedContent] = useState("");
+  const [streamedCitations, setStreamedCitations] = useState<readonly ChatCitation[]>([]);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const loadConversations = useCallback(async (preferredId?: string) => {
@@ -65,19 +70,45 @@ export function ChatScreen({ api }: ChatScreenProps) {
   };
 
   const createConversation = async () => {
-    const conversation = await api.createConversation(undefined, {
-      idempotencyKey: createIdempotencyKey("create-chat-conversation"),
-    });
-    await loadConversations(conversation.id);
-    setFeedback("已新建提问集");
+    if (pendingAction) return;
+    setPendingAction("create");
+    setFeedback(null);
+    try {
+      const conversation = await api.createConversation(undefined, {
+        idempotencyKey: createIdempotencyKey("create-chat-conversation"),
+      });
+      await loadConversations(conversation.id);
+      setFeedback("已新建提问集");
+    } catch (error) {
+      setFeedback(
+        error instanceof Error
+          ? `创建提问集失败：${error.message}`
+          : "创建提问集失败，请稍后重试",
+      );
+    } finally {
+      setPendingAction(null);
+    }
   };
 
   const deleteConversation = async (id: string) => {
-    await api.deleteConversation(id, {
-      idempotencyKey: createIdempotencyKey("delete-chat-conversation"),
-    });
-    await loadConversations(activeId === id ? undefined : activeId ?? undefined);
-    setFeedback("提问集已删除");
+    if (pendingAction) return;
+    setPendingAction(`delete:${id}`);
+    setFeedback(null);
+    try {
+      await api.deleteConversation(id, {
+        idempotencyKey: createIdempotencyKey("delete-chat-conversation"),
+      });
+      await loadConversations(activeId === id ? undefined : activeId ?? undefined);
+      setFeedback("提问集已删除");
+    } catch (error) {
+      setFeedback(
+        error instanceof Error
+          ? `删除提问集失败：${error.message}`
+          : "删除提问集失败，请稍后重试",
+      );
+    } finally {
+      setPendingAction(null);
+    }
   };
 
   const submitQuestion = async (event: FormEvent<HTMLFormElement>) => {
@@ -86,10 +117,17 @@ export function ChatScreen({ api }: ChatScreenProps) {
     const currentQuestion = question.trim();
     setQuestion("");
     setSending(true);
+    setPendingQuestion(currentQuestion);
+    setStreamedContent("");
+    setStreamedCitations([]);
     setFeedback(null);
     try {
       await api.sendMessage(activeId, currentQuestion, {
         idempotencyKey: createIdempotencyKey("send-chat-message"),
+        onDelta: (content) => setStreamedContent((current) => current + content),
+        onCitation: (citation) => {
+          setStreamedCitations((current) => [...current, citation]);
+        },
       });
       await loadConversations(activeId);
     } catch (error) {
@@ -97,6 +135,9 @@ export function ChatScreen({ api }: ChatScreenProps) {
       setQuestion(currentQuestion);
     } finally {
       setSending(false);
+      setPendingQuestion(null);
+      setStreamedContent("");
+      setStreamedCitations([]);
     }
   };
 
@@ -112,9 +153,11 @@ export function ChatScreen({ api }: ChatScreenProps) {
         <button
           type="button"
           className="primary chat-new-button"
+          disabled={pendingAction !== null}
           onClick={() => void createConversation()}
         >
-          <Plus size={15} />新建提问集
+          {pendingAction === "create" ? <span className="button-spinner" /> : <Plus size={15} />}
+          {pendingAction === "create" ? "正在新建…" : "新建提问集"}
         </button>
         {conversations.map((conversation) => (
           <div
@@ -135,6 +178,7 @@ export function ChatScreen({ api }: ChatScreenProps) {
             <IconButton
               className="chat-delete-button"
               label={`删除${conversation.title}`}
+              disabled={pendingAction !== null}
               onClick={() => void deleteConversation(conversation.id)}
             >
               <Trash2 size={14} />
@@ -162,6 +206,7 @@ export function ChatScreen({ api }: ChatScreenProps) {
           <button
             type="button"
             className="secondary"
+            disabled={pendingAction !== null}
             onClick={() => void createConversation()}
           >
             <Plus size={14} />新建
@@ -169,7 +214,7 @@ export function ChatScreen({ api }: ChatScreenProps) {
           <button
             type="button"
             className="secondary danger-action"
-            disabled={!activeId}
+            disabled={!activeId || pendingAction !== null}
             onClick={() => activeId ? void deleteConversation(activeId) : undefined}
           >
             <Trash2 size={14} />删除
@@ -228,6 +273,7 @@ export function ChatScreen({ api }: ChatScreenProps) {
                           <div>
                             <span className="chat-source-meta">正式入库来源</span>
                             <strong>{citation.documentName}</strong>
+                            {citation.location ? <small>{citation.location}</small> : null}
                             <small>{citation.excerpt}</small>
                           </div>
                         </article>
@@ -238,12 +284,42 @@ export function ChatScreen({ api }: ChatScreenProps) {
               </div>
             ))}
             {sending ? (
-              <div className="message message-assistant">
-                <b className="avatar ai">智</b>
-                <div className="message-body">
-                  <p>正在检索正式知识库并整理回答…</p>
+              <>
+                <div className="message message-user">
+                  <b className="avatar me">我</b>
+                  <div className="message-body">
+                    <div className="message-author"><strong>你</strong></div>
+                    <p>{pendingQuestion}</p>
+                  </div>
                 </div>
-              </div>
+                <div className="message message-assistant">
+                  <b className="avatar ai">智</b>
+                  <div className="message-body">
+                    <div className="message-author">
+                      <strong>制度助手</strong>
+                      <Status tone="info">实时生成</Status>
+                    </div>
+                    <p>{streamedContent || "正在检索正式知识库并整理回答…"}</p>
+                    {streamedCitations.length > 0 ? (
+                      <div className="chat-sources" aria-label="实时回答引用来源">
+                        {streamedCitations.map((citation, index) => (
+                          <article className="chat-source-card" key={`${citation.documentId}-${index}`}>
+                            <span className="chat-source-index">
+                              {String(index + 1).padStart(2, "0")}
+                            </span>
+                            <div>
+                              <span className="chat-source-meta">正式入库来源</span>
+                              <strong>{citation.documentName}</strong>
+                              {citation.location ? <small>{citation.location}</small> : null}
+                              <small>{citation.excerpt}</small>
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              </>
             ) : null}
           </div>
         </div>
@@ -267,7 +343,11 @@ export function ChatScreen({ api }: ChatScreenProps) {
           </form>
           <small>回答仅供参考，关键制度结论请结合引用原文复核。</small>
           <div className="action-feedback-slot" role="status" aria-live="polite">
-            {feedback ? <span>{feedback}</span> : null}
+            {feedback ? (
+              <span className={feedback.includes("失败") ? "error" : undefined}>
+                {feedback}
+              </span>
+            ) : null}
           </div>
         </footer>
       </section>

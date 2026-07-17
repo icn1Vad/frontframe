@@ -19,6 +19,7 @@ export type ClassificationCandidateState =
 
 export interface ClassificationCandidateRecord {
   readonly id: ClassificationCandidateId;
+  readonly fileId?: string;
   readonly name: string;
   readonly type: DocumentTypeCode;
   readonly level: DocumentLevelCode;

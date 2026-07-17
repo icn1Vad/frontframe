@@ -39,6 +39,8 @@ export function getDocumentStateLabel(state: DocumentState): string {
     case "classified":
       return "已分类";
     case "reviewing":
+      if (state.reviewStatus === "CREATED") return "等待执行";
+      if (state.reviewStatus === "FAILED") return "审校失败";
       return "审查中";
     case "reviewed":
       return "已审查";
@@ -57,6 +59,8 @@ export function getDocumentStateTone(state: DocumentState): StatusTone {
     case "classified":
       return "warning";
     case "reviewing":
+      if (state.reviewStatus === "CREATED") return "warning";
+      if (state.reviewStatus === "FAILED") return "danger";
       return "info";
     case "reviewed":
       return "neutral";

@@ -9,11 +9,9 @@ import {
 } from "../../app";
 import {
   ReviewDocumentsTable,
-  type DocumentId,
   type DocumentSummary,
   type PageResult,
 } from "../../features/documents";
-import { createIdempotencyKey } from "../../shared/lib/idempotency";
 import { PageStack } from "../../shared/ui";
 
 interface ReviewTasksProps {
@@ -29,53 +27,51 @@ function parsePage(value: string | string[] | undefined): number {
 const ReviewTasks: AppPage<ReviewTasksProps> = function ReviewTasks({ result }) {
   const router = useRouter();
   const [rows, setRows] = useState(result.items);
+  const [pageCount, setPageCount] = useState(result.pageCount);
 
   useEffect(() => {
     let active = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     setRows(result.items);
-    void appServices.reviewTasks.list({
-      page: result.page,
-      pageSize: result.pageSize,
-      sort: { by: "updatedAt", direction: "desc" },
-    }).then((clientResult) => {
-      if (active) setRows(clientResult.items);
-    });
+    const load = async () => {
+      if (!active || document.hidden) return;
+      try {
+        const clientResult = await appServices.reviewTasks.list({
+          page: result.page,
+          pageSize: result.pageSize,
+          sort: { by: "updatedAt", direction: "desc" },
+        });
+        if (!active) return;
+        setRows(clientResult.items);
+        setPageCount(clientResult.pageCount);
+        const hasActiveTask = clientResult.items.some(
+          (item) => item.state.kind === "reviewing" && item.state.reviewStatus !== "FAILED",
+        );
+        if (hasActiveTask) timer = setTimeout(() => void load(), 2500);
+      } catch {
+        if (active) setRows([]);
+      }
+    };
+    const handleVisibility = () => {
+      if (!document.hidden) void load();
+      else if (timer) clearTimeout(timer);
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    void load();
     return () => {
       active = false;
+      if (timer) clearTimeout(timer);
+      document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, [result]);
-
-  const replaceRow = (updated: DocumentSummary) => {
-    setRows((current) =>
-      current.map((document) =>
-        document.id === updated.id ? updated : document,
-      ),
-    );
-  };
 
   return (
     <PageStack>
       <ReviewDocumentsTable
         rows={rows}
-        commands={{
-          publish: async (documentId) => {
-            replaceRow(
-              await appServices.reviewTasks.publish(documentId, {
-                idempotencyKey: createIdempotencyKey("publish-review"),
-              }),
-            );
-          },
-        }}
-        onDelete={async (documentId: DocumentId) => {
-          replaceRow(
-            await appServices.reviewTasks.softDelete(documentId, {
-              idempotencyKey: createIdempotencyKey("delete-review"),
-            }),
-          );
-        }}
         pagination={{
           page: result.page,
-          pageCount: result.pageCount,
+          pageCount,
           onPageChange: (page) => {
             void router.push({
               pathname: routes.reviewTasks,
@@ -92,14 +88,13 @@ ReviewTasks.pageConfig = definePageConfig({ moduleId: "reviewTasks" });
 
 export const getServerSideProps: GetServerSideProps<ReviewTasksProps> = async ({
   query,
-}) => ({
-  props: {
-    result: await appServices.reviewTasks.list({
-      page: parsePage(query.page),
-      pageSize: 25,
-      sort: { by: "updatedAt", direction: "desc" },
-    }),
-  },
-});
+}) => {
+  const page = parsePage(query.page);
+  return {
+    props: {
+      result: { items: [], page, pageSize: 25, total: 0, pageCount: 0 },
+    },
+  };
+};
 
 export default ReviewTasks;

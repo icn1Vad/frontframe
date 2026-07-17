@@ -8,7 +8,7 @@ import {
   type ModuleRegistry,
 } from "./module-registry";
 import type { AppPageConfig } from "./page-config";
-import { demoSession, type AppSession } from "./runtime";
+import { defaultSession, type AppSession } from "./runtime";
 
 export interface AppShellProps {
   readonly config: AppPageConfig;
@@ -21,7 +21,7 @@ export function AppShell({
   config,
   children,
   registry = moduleRegistry,
-  session = demoSession,
+  session = defaultSession,
 }: AppShellProps) {
   const router = useRouter();
   const [navigationOpen, setNavigationOpen] = useState(false);

@@ -1,15 +1,21 @@
 import { ArrowRight } from "lucide-react";
+import Image from "next/image";
 import { useRouter } from "next/router";
 import {
   type FormEvent,
   type KeyboardEvent,
+  useCallback,
   useEffect,
   useRef,
   useState,
 } from "react";
 import { routes } from "../../../app/routes";
 import { appServices } from "../../../app/services";
-import { type AuthMode, type RequestedRole } from "../../auth";
+import {
+  type AuthMode,
+  type LoginCaptcha,
+  type RequestedRole,
+} from "../../auth";
 
 interface Feedback {
   readonly kind: "success" | "info" | "error";
@@ -34,6 +40,35 @@ export function LandingAuthPanel() {
   const [mode, setMode] = useState<AuthMode>("login");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [captcha, setCaptcha] = useState<LoginCaptcha | null>(null);
+  const [captchaLoading, setCaptchaLoading] = useState(false);
+  const [captchaError, setCaptchaError] = useState<string | null>(null);
+
+  const loadCaptcha = useCallback(async (): Promise<void> => {
+    if (!appServices.auth.getCaptcha) {
+      setCaptcha(null);
+      return;
+    }
+    setCaptchaLoading(true);
+    setCaptchaError(null);
+    try {
+      setCaptcha(await appServices.auth.getCaptcha());
+    } catch (error) {
+      setCaptcha(null);
+      setCaptchaError(errorMessage(error));
+    } finally {
+      setCaptchaLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (mode === "login") {
+      void loadCaptcha();
+    } else {
+      setCaptcha(null);
+      setCaptchaError(null);
+    }
+  }, [loadCaptcha, mode]);
 
   useEffect(() => {
     if (router.isReady) {
@@ -85,13 +120,24 @@ export function LandingAuthPanel() {
     const formData = new FormData(event.currentTarget);
     const username = String(formData.get("username") ?? "").trim();
     const password = String(formData.get("password") ?? "");
+    const captchaValue = String(formData.get("captcha") ?? "").trim();
 
     setIsSubmitting(true);
     setFeedback(null);
 
     try {
       if (mode === "login") {
-        const result = await appServices.auth.login({ username, password });
+        if (captcha?.isEnabled && (!captcha.uuid || !captchaValue)) {
+          setFeedback({ kind: "error", message: "请输入图片验证码。" });
+          return;
+        }
+        const result = await appServices.auth.login({
+          username,
+          password,
+          ...(captcha?.isEnabled
+            ? { captcha: captchaValue, uuid: captcha.uuid }
+            : {}),
+        });
         setFeedback({ kind: "success", message: result.message });
         await router.push(routes.dashboard);
         return;
@@ -108,6 +154,9 @@ export function LandingAuthPanel() {
       setFeedback({ kind: "info", message: result.message });
     } catch (error) {
       setFeedback({ kind: "error", message: errorMessage(error) });
+      if (mode === "login") {
+        void loadCaptcha();
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -159,6 +208,9 @@ export function LandingAuthPanel() {
         <p className="landing-auth-description">{description}</p>
 
         <form aria-busy={isSubmitting} onSubmit={handleSubmit}>
+          {captchaError ? (
+            <p className="landing-captcha-error">验证码加载失败：{captchaError}</p>
+          ) : null}
           <label htmlFor="landing-username">
             用户名
             <input
@@ -202,9 +254,53 @@ export function LandingAuthPanel() {
             />
           </label>
 
+          {isLogin && (captcha?.isEnabled || captchaLoading || captchaError) ? (
+            <label htmlFor="landing-captcha">
+              图片验证码
+              <span className="landing-captcha-row">
+                <input
+                  autoComplete="off"
+                  disabled={isSubmitting || captchaLoading || !captcha?.uuid}
+                  id="landing-captcha"
+                  key={captcha?.uuid ?? "captcha-loading"}
+                  name="captcha"
+                  placeholder="请输入验证码"
+                  required={captcha?.isEnabled}
+                />
+                <button
+                  aria-label="刷新图片验证码"
+                  className="landing-captcha-image"
+                  disabled={isSubmitting || captchaLoading}
+                  onClick={() => void loadCaptcha()}
+                  title="看不清？点击刷新"
+                  type="button"
+                >
+                  {captchaLoading ? (
+                    <span>加载中…</span>
+                  ) : captcha?.img ? (
+                    <Image
+                      alt="图片验证码"
+                      height={36}
+                      src={captcha.img}
+                      unoptimized
+                      width={111}
+                    />
+                  ) : (
+                    <span>重新加载</span>
+                  )}
+                </button>
+              </span>
+            </label>
+          ) : null}
+
           <button
             className="landing-auth-submit"
-            disabled={isSubmitting}
+            disabled={
+              isSubmitting ||
+              (isLogin &&
+                Boolean(appServices.auth.getCaptcha) &&
+                (!captcha || captchaLoading || Boolean(captchaError)))
+            }
             type="submit"
           >
             <span>

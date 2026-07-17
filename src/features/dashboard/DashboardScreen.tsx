@@ -20,9 +20,9 @@ const metricIcons: readonly LucideIcon[] = [
 ];
 
 const rows = [
-  { category: "制度", pending: 10, reviewing: 1, reviewed: 2 },
-  { category: "合同", pending: 10, reviewing: 1, reviewed: 2 },
-  { category: "报告", pending: 10, reviewing: 1, reviewed: 2 },
+  { category: "制度", pending: 0, reviewing: 0, reviewed: 0 },
+  { category: "合同", pending: 0, reviewing: 0, reviewed: 0 },
+  { category: "报告", pending: 0, reviewing: 0, reviewed: 0 },
 ] as const;
 
 const flowColumns = [

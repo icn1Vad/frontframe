@@ -1,121 +1,71 @@
 import type { GetServerSideProps } from "next";
 import { useEffect, useState } from "react";
-import {
-  appServices,
-  definePageConfig,
-  type AppPage,
-} from "../../../app";
+import { appServices, definePageConfig, type AppPage } from "../../../app";
 import {
   createReviewTaskId,
-  type DocumentId,
   type ReviewReport,
-  type ReviewTaskId,
 } from "../../../features/documents";
 import { ReviewReportScreen } from "../../../features/reviews";
-import { createIdempotencyKey } from "../../../shared/lib/idempotency";
 
 interface ReviewReportPageProps {
   readonly taskId: string;
-  readonly documentId: DocumentId;
-  readonly documentName: string;
-  readonly initialReport: ReviewReport | null;
-  readonly initialReadOnly: boolean;
 }
 
-const ReviewReportPage: AppPage<ReviewReportPageProps> =
-  function ReviewReportPage(props) {
-    const taskId = createReviewTaskId(props.taskId);
-    const [report, setReport] = useState(props.initialReport);
-    const [readOnly, setReadOnly] = useState(props.initialReadOnly);
-    const [loading, setLoading] = useState(props.initialReport === null);
+const ReviewReportPage: AppPage<ReviewReportPageProps> = function ReviewReportPage({ taskId }) {
+  const [report, setReport] = useState<ReviewReport | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
-      let active = true;
-      void Promise.all([
-        appServices.reviewTasks.getReport(taskId),
-        appServices.documents.getByReviewTaskId(taskId),
-      ]).then(([nextReport, document]) => {
-        if (!active) return;
-        setReport(nextReport);
-        setReadOnly(document?.state.kind !== "reviewed");
-        setLoading(false);
-      });
-      return () => {
-        active = false;
-      };
-    }, [taskId]);
-
-    if (loading) {
-      return <div className="table-state">正在加载审查报告…</div>;
-    }
-    if (!report) {
-      return <div className="table-state">审查报告尚未生成</div>;
-    }
-
-    return (
-      <ReviewReportScreen
-        {...props}
-        initialReport={report}
-        readOnly={readOnly}
-        onResolveRisk={async (riskId) => {
-          return appServices.reviewTasks.resolveRisk(taskId, riskId, {
-            idempotencyKey: createIdempotencyKey("resolve-review-risk"),
-          });
-        }}
-        onIgnoreRisk={async (riskId, reason) => {
-          return appServices.reviewTasks.ignoreRisk(taskId, riskId, reason ?? "", {
-            idempotencyKey: createIdempotencyKey("ignore-review-risk"),
-          });
-        }}
-        onIgnoreAllRisks={async (reason) => {
-          return appServices.reviewTasks.ignoreAllRisks(taskId, reason, {
-            idempotencyKey: createIdempotencyKey("ignore-review-risks"),
-          });
-        }}
-        onPublish={
-          readOnly
-            ? undefined
-            : async () => {
-                await appServices.reviewTasks.publish(props.documentId, {
-                  idempotencyKey: createIdempotencyKey("publish-review-report"),
-                });
-              }
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    setError(null);
+    void appServices.reviewTasks
+      .getReport(createReviewTaskId(taskId), { signal: controller.signal })
+      .then((nextReport) => setReport(nextReport))
+      .catch((reason: unknown) => {
+        if (!controller.signal.aborted) {
+          setError(reason instanceof Error ? reason.message : "审校报告加载失败");
         }
-      />
-    );
-  };
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [taskId]);
+
+  if (loading) return <div className="table-state">正在加载审校报告…</div>;
+  if (error) return <div className="table-state">{error}</div>;
+  if (!report) return <div className="table-state">审校报告尚未生成</div>;
+
+  const keepReadOnly = async () => report;
+  return (
+    <ReviewReportScreen
+      taskId={taskId}
+      documentName={report.documentName}
+      initialReport={report}
+      readOnly
+      onResolveRisk={keepReadOnly}
+      onIgnoreRisk={keepReadOnly}
+      onIgnoreAllRisks={keepReadOnly}
+    />
+  );
+};
 
 ReviewReportPage.pageConfig = definePageConfig({
   moduleId: "reviewReport",
   activeModuleId: "reviewTasks",
 });
 
-export const getServerSideProps: GetServerSideProps<
-  ReviewReportPageProps
-> = async ({ params }) => {
-  const rawTaskId = params?.taskId;
-  if (typeof rawTaskId !== "string") return { notFound: true };
-
-  let taskId: ReviewTaskId;
+export const getServerSideProps: GetServerSideProps<ReviewReportPageProps> = async ({ params }) => {
+  const taskId = params?.taskId;
+  if (typeof taskId !== "string") return { notFound: true };
   try {
-    taskId = createReviewTaskId(rawTaskId);
+    createReviewTaskId(taskId);
   } catch {
     return { notFound: true };
   }
-
-  const document = await appServices.documents.getByReviewTaskId(taskId);
-  if (!document) return { notFound: true };
-  const initialReport = await appServices.reviewTasks.getReport(taskId);
-
-  return {
-    props: {
-      taskId,
-      documentId: document.id,
-      documentName: document.name,
-      initialReport,
-      initialReadOnly: document.state.kind !== "reviewed",
-    },
-  };
+  return { props: { taskId } };
 };
 
 export default ReviewReportPage;

@@ -2,6 +2,7 @@
 const apiBackendOrigin = process.env.API_BACKEND_ORIGIN?.replace(/\/+$/, "");
 
 const nextConfig = {
+  output: "standalone",
   reactStrictMode: true,
   async rewrites() {
     if (!apiBackendOrigin) return [];
