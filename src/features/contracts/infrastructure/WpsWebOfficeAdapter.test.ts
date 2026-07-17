@@ -65,7 +65,7 @@ describe("WpsWebOfficeAdapter", () => {
     adapter.onEvent((event) => events.push(event.type));
 
     await adapter.mount({} as HTMLElement, session);
-    expect(fixture.setReadOnly).toHaveBeenCalledWith(false);
+    expect(fixture.setReadOnly).not.toHaveBeenCalled();
     fixture.handlers.get("fileOpen")?.({ success: true });
     fixture.handlers.get("WindowSelectionChange")?.({ begin: 1, end: 5 });
     await adapter.save();
@@ -82,7 +82,7 @@ describe("WpsWebOfficeAdapter", () => {
 
     await adapter.mount({} as HTMLElement, { ...session, readonly: true, canFinalize: false });
 
-    expect(fixture.setReadOnly).toHaveBeenCalledWith(true);
+    expect(fixture.setReadOnly).toHaveBeenCalledWith({ Value: true });
   });
 
   it("maps WPS storage errors without leaking raw responses", async () => {

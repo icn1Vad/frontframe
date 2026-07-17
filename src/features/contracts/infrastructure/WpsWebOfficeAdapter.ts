@@ -24,7 +24,7 @@ interface WpsDocument {
   Find: WpsFind;
   TrackRevisions?: boolean;
   Range(start: number, end: number): WpsRange | Promise<WpsRange>;
-  SetReadOnly?(readonly: boolean): Promise<unknown>;
+  SetReadOnly?(options: { readonly Value: boolean }): Promise<unknown>;
 }
 
 interface WpsApplication {
@@ -290,8 +290,8 @@ export class WpsWebOfficeAdapter {
       await Promise.race([instance.ready(), fileOpenFailure]);
       this.application = instance.Application;
       this.documentVersionId = session.documentVersionId;
-      if (this.application.ActiveDocument.SetReadOnly) {
-        await this.application.ActiveDocument.SetReadOnly(session.readonly);
+      if (session.readonly && this.application.ActiveDocument.SetReadOnly) {
+        await this.application.ActiveDocument.SetReadOnly({ Value: true });
       }
     } catch (error) {
       const normalized = error instanceof WpsEditorError
