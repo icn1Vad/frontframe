@@ -1,5 +1,6 @@
 import type {
   ContractEditorSession,
+  ContractEditorFinalizeResult,
   ContractReviewTask,
   ContractRiskState,
   CreateContractReviewTaskInput,
@@ -31,6 +32,10 @@ export interface ContractReviewApi {
     taskId: string,
     options?: ContractRequestOptions,
   ): Promise<ContractEditorSession>;
+  finalizeEditor(
+    taskId: string,
+    options: ContractMutationOptions,
+  ): Promise<ContractEditorFinalizeResult>;
   createTask(
     input: CreateContractReviewTaskCommand,
     options: ContractMutationOptions,

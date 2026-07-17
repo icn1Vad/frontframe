@@ -59,6 +59,7 @@ import {
   decodeChatMessageResult,
   decodeConfirmedCandidateBatchResult,
   decodeContractEditorSession,
+  decodeContractEditorFinalizeResult,
   decodeContractReviewTask,
   decodeContractReviewTaskArray,
   decodeDashboardOverview,
@@ -529,6 +530,17 @@ export class ContractReviewHttpAdapter implements ContractReviewApi {
     return this.client.request(
       `/contract-review/tasks/${encodeURIComponent(taskId)}/editor-session`,
       { signal: options?.signal, decode: decodeContractEditorSession },
+    );
+  }
+
+  finalizeEditor(taskId: string, options: ContractMutationOptions) {
+    return this.client.request(
+      `/contract-review/tasks/${encodeURIComponent(taskId)}/editor-finalize`,
+      {
+        method: "POST",
+        ...mutationOptions(options),
+        decode: decodeContractEditorFinalizeResult,
+      },
     );
   }
 

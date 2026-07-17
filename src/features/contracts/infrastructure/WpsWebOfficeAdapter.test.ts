@@ -16,6 +16,8 @@ const session: WpsContractEditorSession = {
   documentVersionId: "version-id",
   officeType: "writer",
   readonly: false,
+  canFinalize: true,
+  draft: { status: "none", revision: 0 },
   currentUser: { id: "user-id", name: "张三", permission: "write" },
   token: { token: "short-lived-token", timeout: 600_000 },
   expiresAt: "2026-07-17T08:00:00.000Z",

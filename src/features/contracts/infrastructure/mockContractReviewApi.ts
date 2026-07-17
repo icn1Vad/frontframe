@@ -233,6 +233,18 @@ export const mockContractReviewApi: ContractReviewApi = {
     };
   },
 
+  async finalizeEditor(taskId, options) {
+    options.signal?.throwIfAborted();
+    const task = readTasks().find((candidate) => candidate.id === taskId);
+    if (!task) throw new Error("Contract review task not found");
+    return {
+      documentId: task.documentId,
+      documentVersionId: `${task.documentVersionId}-final`,
+      versionNumber: task.version + 1,
+      requiresNewReview: true,
+    };
+  },
+
   async createTask(input, options) {
     options.signal?.throwIfAborted();
     const task = createTaskRecord({

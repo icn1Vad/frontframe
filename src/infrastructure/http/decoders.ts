@@ -718,6 +718,25 @@ function decodeChatMessage(value: unknown): ChatMessage {
   return { ...message, role };
 }
 
+export function decodeContractEditorFinalizeResult(value: unknown) {
+  const input = record(value, "contractEditorFinalizeResult");
+  return {
+    documentId: string(input.documentId, "contractEditorFinalizeResult.documentId"),
+    documentVersionId: string(
+      input.documentVersionId,
+      "contractEditorFinalizeResult.documentVersionId",
+    ),
+    versionNumber: number(
+      input.versionNumber,
+      "contractEditorFinalizeResult.versionNumber",
+    ),
+    requiresNewReview: boolean(
+      input.requiresNewReview,
+      "contractEditorFinalizeResult.requiresNewReview",
+    ),
+  };
+}
+
 export function decodeChatConversation(value: unknown): ChatConversation {
   const input = record(value, "chatConversation");
   return {

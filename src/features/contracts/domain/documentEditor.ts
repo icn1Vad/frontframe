@@ -41,6 +41,12 @@ export interface WpsContractEditorSession {
   readonly documentVersionId: string;
   readonly officeType: "writer";
   readonly readonly: boolean;
+  readonly canFinalize: boolean;
+  readonly draft: {
+    readonly status: "none" | "active";
+    readonly revision: number;
+    readonly updatedAt?: string;
+  };
   readonly currentUser: ContractEditorUser;
   readonly token: string | WpsTokenData;
   readonly expiresAt: string;
@@ -48,6 +54,13 @@ export interface WpsContractEditorSession {
   readonly endpoint?: string;
   readonly mode?: "normal" | "simple";
   readonly customArgs?: Readonly<Record<string, string | number | boolean>>;
+}
+
+export interface ContractEditorFinalizeResult {
+  readonly documentId: string;
+  readonly documentVersionId: string;
+  readonly versionNumber: number;
+  readonly requiresNewReview: boolean;
 }
 
 export type ContractEditorSession =
@@ -128,6 +141,16 @@ function isEditorUser(value: unknown): value is ContractEditorUser {
     (candidate.permission === "read" || candidate.permission === "write");
 }
 
+function isDraftState(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as { status?: unknown; revision?: unknown; updatedAt?: unknown };
+  return (candidate.status === "none" || candidate.status === "active") &&
+    typeof candidate.revision === "number" && Number.isInteger(candidate.revision) &&
+    candidate.revision >= 0 &&
+    (candidate.updatedAt === undefined ||
+      (isNonEmptyString(candidate.updatedAt) && Number.isFinite(Date.parse(candidate.updatedAt))));
+}
+
 export function isContractEditorSession(
   value: unknown,
 ): value is ContractEditorSession {
@@ -144,6 +167,8 @@ export function isContractEditorSession(
     isNonEmptyString(candidate.documentVersionId) &&
     candidate.officeType === "writer" &&
     typeof candidate.readonly === "boolean" &&
+    typeof candidate.canFinalize === "boolean" &&
+    isDraftState(candidate.draft) &&
     isEditorUser(candidate.currentUser) &&
     isWpsToken(candidate.token) &&
     isNonEmptyString(candidate.expiresAt) &&

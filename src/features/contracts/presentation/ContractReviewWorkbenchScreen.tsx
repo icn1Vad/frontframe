@@ -102,6 +102,7 @@ export function ContractReviewWorkbenchScreen({
   const [editorMode, setEditorMode] = useState<EditorMode>("mock");
   const [editorSession, setEditorSession] = useState<ContractEditorSession | null>(null);
   const [wpsReady, setWpsReady] = useState(false);
+  const [finalizing, setFinalizing] = useState(false);
   const [selectedRiskId, setSelectedRiskId] = useState<string | null>(null);
   const [question, setQuestion] = useState("");
   const [chatPending, setChatPending] = useState(false);
@@ -310,22 +311,25 @@ export function ContractReviewWorkbenchScreen({
   };
 
   const saveWpsDocument = async () => {
-    if (!wpsEditorRef.current || !wpsReady) return;
+    if (!task || !wpsEditorRef.current || !wpsReady || finalizing ||
+        editorSession?.provider !== "wps" || !editorSession.canFinalize) return;
+    setFinalizing(true);
     try {
-      const result = await wpsEditorRef.current.save();
-      if (result.status === "ok") {
-        setEditorMode("mock");
-        setEditorSession({
-          provider: "mock",
-          reason: "文档已保存为新版本；当前审查任务保留为历史记录",
-        });
-        setWpsReady(false);
-        setFeedback("文档已保存为新版本；当前任务已停止编辑，请对新版本重新发起审查");
-      } else {
-        setFeedback("文档内容没有变化，无需创建新版本");
-      }
+      await wpsEditorRef.current.save();
+      const finalized = await api.finalizeEditor(task.id, {
+        idempotencyKey: createIdempotencyKey("finalize-contract-editor"),
+      });
+      setEditorMode("mock");
+      setEditorSession({
+        provider: "mock",
+        reason: `文档已生成正式版本 ${finalized.versionNumber}；当前审查任务保留为历史记录`,
+      });
+      setWpsReady(false);
+      setFeedback(`已生成正式版本 ${finalized.versionNumber}，请基于新版本重新发起审查`);
     } catch (error) {
       setFeedback(error instanceof Error ? error.message : "在线文档保存失败");
+    } finally {
+      setFinalizing(false);
     }
   };
 
@@ -415,7 +419,11 @@ export function ContractReviewWorkbenchScreen({
                   <button type="button" className={sourceView === "revision" ? "selected" : ""} onClick={() => setSourceView("revision")}>修订预览</button>
                 </div>
               ) : (
-                <button type="button" className="secondary contract-wps-save" disabled={!wpsReady} onClick={() => void saveWpsDocument()}><Save size={12} />保存文档</button>
+                editorSession?.provider === "wps" && editorSession.canFinalize ? (
+                  <button type="button" className="secondary contract-wps-save" disabled={!wpsReady || finalizing} onClick={() => void saveWpsDocument()}><Save size={12} />{finalizing ? "正在生成版本" : "保存并生成新版本"}</button>
+                ) : (
+                  <button type="button" className="secondary contract-wps-save" disabled><Save size={12} />只读预览</button>
+                )
               )}
             </div>
           </div>
