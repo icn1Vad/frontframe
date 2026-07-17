@@ -26,6 +26,7 @@ const session: WpsContractEditorSession = {
 function createSdk(saveResult: unknown) {
   const handlers = new Map<string, (data: unknown) => void>();
   const destroy = vi.fn();
+  const setReadOnly = vi.fn(async () => undefined);
   const remove = vi.fn((name: string) => handlers.delete(name));
   const instance = {
     Application: {
@@ -36,6 +37,7 @@ function createSdk(saveResult: unknown) {
           Execute: vi.fn(async () => undefined),
         },
         Range: vi.fn(() => ({ Text: "合同原文" })),
+        SetReadOnly: setReadOnly,
       },
     },
     ApiEvent: {
@@ -52,7 +54,7 @@ function createSdk(saveResult: unknown) {
     OfficeType: { Writer: "w" },
     init: vi.fn(() => instance),
   } as unknown as WpsWebOfficeSdk;
-  return { sdk, handlers, destroy, remove };
+  return { sdk, handlers, destroy, remove, setReadOnly };
 }
 
 describe("WpsWebOfficeAdapter", () => {
@@ -63,6 +65,7 @@ describe("WpsWebOfficeAdapter", () => {
     adapter.onEvent((event) => events.push(event.type));
 
     await adapter.mount({} as HTMLElement, session);
+    expect(fixture.setReadOnly).toHaveBeenCalledWith(false);
     fixture.handlers.get("fileOpen")?.({ success: true });
     fixture.handlers.get("WindowSelectionChange")?.({ begin: 1, end: 5 });
     await adapter.save();
@@ -71,6 +74,15 @@ describe("WpsWebOfficeAdapter", () => {
     expect(events).toEqual(["file-opened", "selection-changed", "save-succeeded"]);
     expect(fixture.remove).toHaveBeenCalledTimes(3);
     expect(fixture.destroy).toHaveBeenCalledOnce();
+  });
+
+  it("explicitly keeps read-only sessions locked", async () => {
+    const fixture = createSdk({ result: "nochange" });
+    const adapter = new WpsWebOfficeAdapter(async () => fixture.sdk);
+
+    await adapter.mount({} as HTMLElement, { ...session, readonly: true, canFinalize: false });
+
+    expect(fixture.setReadOnly).toHaveBeenCalledWith(true);
   });
 
   it("maps WPS storage errors without leaking raw responses", async () => {

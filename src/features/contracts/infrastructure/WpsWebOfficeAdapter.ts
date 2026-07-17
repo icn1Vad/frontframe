@@ -290,8 +290,8 @@ export class WpsWebOfficeAdapter {
       await Promise.race([instance.ready(), fileOpenFailure]);
       this.application = instance.Application;
       this.documentVersionId = session.documentVersionId;
-      if (session.readonly && this.application.ActiveDocument.SetReadOnly) {
-        await this.application.ActiveDocument.SetReadOnly(true);
+      if (this.application.ActiveDocument.SetReadOnly) {
+        await this.application.ActiveDocument.SetReadOnly(session.readonly);
       }
     } catch (error) {
       const normalized = error instanceof WpsEditorError
