@@ -2030,6 +2030,9 @@ components:
 
     MockEditorSession:
       type: object
+      description: >-
+        仅供本地开发代理和未配置 WPS 时降级验证。生产后端正常响应应使用
+        WpsEditorSession，不应把 mock provider 作为正式在线编辑能力。
       required: [provider, reason]
       properties:
         provider:
