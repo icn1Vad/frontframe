@@ -1,8 +1,20 @@
-import { appServices, definePageConfig, type AppPage } from "../app";
-import { ContractReviewUploadScreen } from "../features/contracts";
+import {
+  appServices,
+  contractReviewAuth,
+  definePageConfig,
+  type AppPage,
+} from "../app";
+import {
+  ContractReviewUploadScreen,
+  ContractWorkspaceGate,
+} from "../features/contracts";
 
 const ContractReview: AppPage = function ContractReview() {
-  return <ContractReviewUploadScreen api={appServices.contractReview} />;
+  return (
+    <ContractWorkspaceGate auth={contractReviewAuth}>
+      <ContractReviewUploadScreen api={appServices.contractReview} />
+    </ContractWorkspaceGate>
+  );
 };
 
 ContractReview.pageConfig = definePageConfig({ moduleId: "contractReview" });

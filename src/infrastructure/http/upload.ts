@@ -10,11 +10,20 @@ export interface UploadFileOptions {
   readonly signal?: AbortSignal;
 }
 
+const DOCX_CONTENT_TYPE =
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+function uploadContentType(file: File): string {
+  if (/\.docx$/i.test(file.name)) return DOCX_CONTENT_TYPE;
+  return file.type || "application/octet-stream";
+}
+
 export async function uploadFileToObjectStorage(
   client: HttpClient,
   file: File,
   options: UploadFileOptions,
 ): Promise<UploadedFileResource> {
+  const contentType = uploadContentType(file);
   const session = await client.request<PresignedUploadSession>(
     "/uploads/initiate",
     {
@@ -22,7 +31,7 @@ export async function uploadFileToObjectStorage(
       body: {
         fileName: file.name,
         size: file.size,
-        contentType: file.type || "application/octet-stream",
+        contentType,
         lastModified: file.lastModified,
       },
       idempotencyKey: `${options.idempotencyKey}:initiate`,
@@ -34,7 +43,7 @@ export async function uploadFileToObjectStorage(
   if (!uploadHeaders.has("Content-Type")) {
     uploadHeaders.set(
       "Content-Type",
-      file.type || "application/octet-stream",
+      contentType,
     );
   }
   const uploadResponse = await client.fetchExternal(session.uploadUrl, {

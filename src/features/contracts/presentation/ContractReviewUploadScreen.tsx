@@ -29,7 +29,7 @@ function formatFileSize(size: number): string {
 }
 
 function isSupportedContract(file: File): boolean {
-  return /\.(docx|pdf)$/i.test(file.name);
+  return /\.docx$/i.test(file.name);
 }
 
 export function ContractReviewUploadScreen({
@@ -54,7 +54,7 @@ export function ContractReviewUploadScreen({
   const addFile = (file: File | undefined) => {
     if (!file) return;
     if (!isSupportedContract(file)) {
-      setFeedback("合同审查目前只接受文字文档或便携文档");
+      setFeedback("当前 WPS 在线编辑阶段只接受 DOCX 文件");
       return;
     }
     setPendingFile({ name: file.name, size: file.size, file });
@@ -95,10 +95,6 @@ export function ContractReviewUploadScreen({
       }, {
         idempotencyKey: createIdempotencyKey("create-contract-review"),
       });
-      await api.startReview(createdTask.id, {
-        idempotencyKey: createIdempotencyKey("start-contract-review"),
-        expectedVersion: createdTask.version,
-      });
       await router.push(routes.contractReviewTask(createdTask.id));
     } catch (error) {
       setFeedback(
@@ -131,7 +127,7 @@ export function ContractReviewUploadScreen({
             ref={fileInputRef}
             className="visually-hidden"
             type="file"
-            accept=".docx,.pdf"
+            accept=".docx"
             onChange={handleFileInput}
           />
           <button
@@ -145,12 +141,12 @@ export function ContractReviewUploadScreen({
           >
             <span className="contract-dropzone-icon"><UploadCloud size={30} /></span>
             <strong>将合同拖入这里，或点击选择文件</strong>
-            <small>支持文字文档和便携文档，单个文件最大 50 兆字节</small>
+            <small>支持 DOCX，单个文件最大 50 兆字节</small>
             <span className="secondary">选择合同文件</span>
           </button>
           <div className="contract-upload-note">
             <Settings2 size={16} />
-            <span>上传后可修改文件名称、审查偏向和检查模块，开始审查后直接进入合同审查工作台。</span>
+            <span>上传后可修改文件名称和配置，创建任务后直接进入 WPS 在线编辑页面。</span>
           </div>
         </Surface>
         {feedback ? <p className="action-feedback error">{feedback}</p> : null}
@@ -164,7 +160,7 @@ export function ContractReviewUploadScreen({
         <div>
           <div className="contract-eyebrow">合同专项审查配置</div>
           <h2>确认合同审查配置</h2>
-          <p>开始后直接创建条款级合同审查任务并进入审查工作台，不经过文件分类任务池。</p>
+          <p>确认后创建真实合同任务并进入 WPS 在线编辑页面，不启动尚未接入的智能审查。</p>
         </div>
         <button
           type="button"
@@ -241,7 +237,7 @@ export function ContractReviewUploadScreen({
           </aside>
         </div>
         <div className="contract-confirm-footer">
-          <p>{feedback ?? `已选择 ${modules.length} 个检查模块，开始后直接进入审查工作台。`}</p>
+          <p>{feedback ?? `已选择 ${modules.length} 个检查模块，本阶段仅用于记录，暂不启动智能审查。`}</p>
           <button
             type="button"
             className="primary"
@@ -249,7 +245,7 @@ export function ContractReviewUploadScreen({
             onClick={() => void confirmTask()}
           >
             {submitting ? <span className="button-spinner" aria-hidden="true" /> : <Plus size={15} />}
-            {submitting ? "正在开始审查" : "开始审查"}
+            {submitting ? "正在创建任务" : "创建并打开合同"}
           </button>
         </div>
       </Surface>

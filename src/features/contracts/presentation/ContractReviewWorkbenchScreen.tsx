@@ -6,7 +6,6 @@ import {
   FileText,
   Highlighter,
   MessageCircle,
-  Save,
   Send,
   ShieldAlert,
   Sparkles,
@@ -50,6 +49,7 @@ interface ChatMessage {
 }
 
 function statusMeta(task: ContractReviewTask) {
+  if (task.status === "preview") return { label: "WPS 可预览编辑", tone: "info" as const };
   if (task.status === "stored") return { label: "已入库", tone: "success" as const };
   if (task.status === "reported") return { label: "报告已生成", tone: "warning" as const };
   if (task.status === "reviewing") return { label: "智能审查中", tone: "info" as const };
@@ -142,22 +142,13 @@ export function ContractReviewWorkbenchScreen({
         ]);
       }
       setLoading(false);
-    }).catch(() => {
-      if (active) setLoading(false);
+    }).catch((error: unknown) => {
+      if (!active) return;
+      setFeedback(error instanceof Error ? error.message : "合同或编辑会话加载失败");
+      setLoading(false);
     });
     return () => { active = false; };
   }, [api, taskId]);
-
-  useEffect(() => {
-    if (!task || task.status !== "queued") return;
-    void api.startReview(task.id, {
-      idempotencyKey: createIdempotencyKey("start-contract-review"),
-      expectedVersion: task.version,
-    }).then((updated) => {
-      setTask(updated);
-      setProgress(updated.progress);
-    });
-  }, [api, task]);
 
   useEffect(() => {
     if (!task || task.status !== "reviewing") return;
@@ -298,16 +289,6 @@ export function ContractReviewWorkbenchScreen({
     }
   };
 
-  const saveWpsDocument = async () => {
-    if (!wpsEditorRef.current || !wpsReady) return;
-    try {
-      await wpsEditorRef.current.save();
-      setFeedback("在线文档已保存，服务端将生成新的文件版本");
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : "在线文档保存失败");
-    }
-  };
-
   const askQuestion = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!task || !question.trim() || chatPending) return;
@@ -335,6 +316,7 @@ export function ContractReviewWorkbenchScreen({
   }
 
   const status = statusMeta(task);
+  const previewOnly = task.status === "preview";
 
   return (
     <PageStack className="contract-workbench-stack">
@@ -345,7 +327,13 @@ export function ContractReviewWorkbenchScreen({
           <div className="contract-title-line"><FileText size={21} /><h2>{task.name}</h2><Status tone={status.tone}>{status.label}</Status></div>
           <p>{contractReviewStanceLabels[task.stance]} · 已选择 {task.modules.length} 个审查模块</p>
         </div>
-        <div className="contract-workbench-actions">
+        {previewOnly ? (
+          <div className="contract-workbench-actions">
+            <Status tone={editorSession?.provider === "wps" && !editorSession.readonly ? "success" : "info"}>
+              {editorSession?.provider === "wps" && !editorSession.readonly ? "允许输入修改" : "只读权限"}
+            </Status>
+          </div>
+        ) : <div className="contract-workbench-actions">
           {reportGenerated ? (
             <button type="button" className="primary" disabled={!canStore} title={canStore ? undefined : "请先处理全部风险项"} onClick={() => void storeTask()}>
               <CheckCircle2 size={15} /> {task.status === "stored" ? "已入库" : "确认并入库"}
@@ -355,10 +343,17 @@ export function ContractReviewWorkbenchScreen({
               <Sparkles size={15} /> {reviewComplete ? "生成审查报告" : "审查进行中"}
             </button>
           )}
-        </div>
+        </div>}
       </header>
 
-      {!reportGenerated ? (
+      {previewOnly ? (
+        <section className="contract-progress-panel contract-wps-phase-note">
+          <div>
+            <strong>真实 DOCX 在线编辑验证</strong>
+            <span>本阶段只验证 WPS 打开和输入修改；智能审查、风险处理、报告和正式版本保存暂未接入。</span>
+          </div>
+        </section>
+      ) : !reportGenerated ? (
         <section className="contract-progress-panel">
           <div className="contract-progress-heading"><div><span>智能合同审查</span><strong>{progress}%</strong></div><Status tone="info">正在对照文本分析</Status></div>
           <div className="contract-progress-track"><i style={{ width: `${progress}%` }} /></div>
@@ -393,15 +388,17 @@ export function ContractReviewWorkbenchScreen({
                   <button type="button" className={sourceView === "original" ? "selected" : ""} onClick={() => setSourceView("original")}>原文</button>
                   <button type="button" className={sourceView === "revision" ? "selected" : ""} onClick={() => setSourceView("revision")}>修订预览</button>
                 </div>
-              ) : (
-                <button type="button" className="secondary contract-wps-save" disabled={!wpsReady} onClick={() => void saveWpsDocument()}><Save size={12} />保存文档</button>
-              )}
+              ) : null}
             </div>
           </div>
           <div className="contract-source-meta">
             <span><FileText size={13} /> {task.name}</span>
             <span>{editorMode === "wps" ? (wpsReady ? "编辑器已连接" : "编辑器连接中") : "第 1 / 3 页"}</span>
-            <span className="contract-editor-badge"><Highlighter size={12} /> 点击风险卡片可定位原文</span>
+            {editorSession?.provider === "wps" ? (
+              <span className="contract-editor-badge">
+                {editorSession.readonly ? "当前会话只读" : "当前会话可输入修改"}
+              </span>
+            ) : null}
           </div>
           {editorMode === "wps" && editorSession?.provider === "wps" ? (
             <WpsWebOfficeEditor
@@ -440,8 +437,8 @@ export function ContractReviewWorkbenchScreen({
         <aside className="contract-analysis-panel">
           <div className="contract-analysis-tabs" role="tablist" aria-label="合同分析工具">
             <button type="button" role="tab" aria-selected={activeTab === "risks"} className={activeTab === "risks" ? "selected" : ""} onClick={() => setActiveTab("risks")}><ShieldAlert size={15} />风险项目<span>{openRisks.length}</span></button>
-            <button type="button" role="tab" aria-selected={activeTab === "parse"} className={activeTab === "parse" ? "selected" : ""} onClick={() => setActiveTab("parse")}><FileText size={15} />合同解析</button>
-            <button type="button" role="tab" aria-selected={activeTab === "chat"} className={activeTab === "chat" ? "selected" : ""} onClick={() => setActiveTab("chat")}><MessageCircle size={15} />实时问答</button>
+            <button type="button" role="tab" aria-selected={activeTab === "parse"} className={activeTab === "parse" ? "selected" : ""} disabled={previewOnly} title={previewOnly ? "本阶段暂未接入" : undefined} onClick={() => setActiveTab("parse")}><FileText size={15} />合同解析</button>
+            <button type="button" role="tab" aria-selected={activeTab === "chat"} className={activeTab === "chat" ? "selected" : ""} disabled={previewOnly} title={previewOnly ? "本阶段暂未接入" : undefined} onClick={() => setActiveTab("chat")}><MessageCircle size={15} />实时问答</button>
           </div>
 
           {activeTab === "risks" ? (
@@ -449,7 +446,7 @@ export function ContractReviewWorkbenchScreen({
               <div className="contract-panel-heading"><div><h3>风险项目</h3><p>点击卡片或“定位原文”，左侧会滚动到对应条款。</p></div><span className="contract-risk-total">{task.risks.length} 项</span></div>
               <div className="contract-risk-filter-summary"><span className="high">高风险 {riskCounts.high}</span><span className="medium">中风险 {riskCounts.medium}</span><span className="low">低风险 {riskCounts.low}</span></div>
               <div className="contract-risk-list">
-                {task.risks.length === 0 ? <div className="contract-risk-empty"><CheckCircle2 size={22} /><strong>当前模块未发现风险项</strong><span>人工确认后可以直接入库。</span></div> : null}
+                {task.risks.length === 0 ? <div className="contract-risk-empty"><CheckCircle2 size={22} /><strong>{previewOnly ? "WPS 编辑功能已独立开放" : "当前模块未发现风险项"}</strong><span>{previewOnly ? "风险审查链路本阶段暂未接入。" : "人工确认后可以直接入库。"}</span></div> : null}
                 {task.risks.map((risk) => {
                   const selected = risk.id === selectedRiskId;
                   const handled = risk.state !== "open";

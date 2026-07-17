@@ -1,4 +1,4 @@
-import { ArrowRight, Clock3, FileText, Play, Plus, RefreshCw } from "lucide-react";
+import { ArrowRight, Clock3, FileText, Plus, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/router";
 import type { ContractReviewApi } from "../application";
@@ -9,7 +9,6 @@ import {
   type ContractReviewTaskStatus,
 } from "../domain";
 import { routes } from "../../../app";
-import { createIdempotencyKey } from "../../../shared/lib/idempotency";
 import { PageStack, PageToolbar, StatGrid, Status, Surface } from "../../../shared/ui";
 
 export interface ContractReviewTasksScreenProps {
@@ -20,6 +19,8 @@ type TaskFilter = "all" | ContractReviewTaskStatus;
 
 function taskStatusMeta(status: ContractReviewTaskStatus) {
   switch (status) {
+    case "preview":
+      return { label: "可预览编辑", tone: "info" as const };
     case "queued":
       return { label: "待开始", tone: "neutral" as const };
     case "reviewing":
@@ -75,6 +76,7 @@ export function ContractReviewTasksScreen({ api }: ContractReviewTasksScreenProp
   );
   const counts = useMemo(() => ({
     total: tasks.length,
+    preview: tasks.filter((task) => task.status === "preview").length,
     queued: tasks.filter((task) => task.status === "queued").length,
     reviewing: tasks.filter((task) => task.status === "reviewing").length,
     reported: tasks.filter((task) => task.status === "reported").length,
@@ -85,15 +87,9 @@ export function ContractReviewTasksScreen({ api }: ContractReviewTasksScreenProp
     setBusyTaskId(task.id);
     setFeedback(null);
     try {
-      if (task.status === "queued") {
-        await api.startReview(task.id, {
-          idempotencyKey: createIdempotencyKey("start-contract-review"),
-          expectedVersion: task.version,
-        });
-      }
       await router.push(routes.contractReviewTask(task.id));
     } catch (error) {
-      setFeedback(error instanceof Error ? `启动审查失败：${error.message}` : "启动审查失败，请稍后重试");
+      setFeedback(error instanceof Error ? `打开合同失败：${error.message}` : "打开合同失败，请稍后重试");
     } finally {
       setBusyTaskId(null);
     }
@@ -118,7 +114,7 @@ export function ContractReviewTasksScreen({ api }: ContractReviewTasksScreenProp
       </PageToolbar>
       <StatGrid className="contract-stats-row">
         <Surface><span>合同任务总数</span><strong>{counts.total}</strong><small>条款级专项审查记录</small></Surface>
-        <Surface><span>待开始</span><strong>{counts.queued}</strong><small>等待人工启动审查</small></Surface>
+        <Surface><span>可预览编辑</span><strong>{counts.preview}</strong><small>真实 DOCX 在线编辑任务</small></Surface>
         <Surface><span>审查中</span><strong>{counts.reviewing}</strong><small>系统正在生成分析</small></Surface>
         <Surface><span>待处理报告</span><strong>{counts.reported}</strong><small>需要人工确认风险</small></Surface>
       </StatGrid>
@@ -126,12 +122,13 @@ export function ContractReviewTasksScreen({ api }: ContractReviewTasksScreenProp
         <div className="contract-task-toolbar">
           <div>
             <h3>全部合同任务</h3>
-            <p>可按状态筛选，点击“开始审查”进入合同审查工作台。</p>
+            <p>可按状态筛选，点击“打开合同”进入 WPS 在线编辑页面。</p>
           </div>
           <label className="contract-filter-label">
             <span>任务状态</span>
             <select value={filter} onChange={(event) => setFilter(event.target.value as TaskFilter)}>
               <option value="all">全部状态</option>
+              <option value="preview">可预览编辑</option>
               <option value="queued">待开始</option>
               <option value="reviewing">审查中</option>
               <option value="reported">报告已生成</option>
@@ -173,9 +170,9 @@ export function ContractReviewTasksScreen({ api }: ContractReviewTasksScreenProp
                   {task.status === "reviewing" ? <span className="contract-progress-mini"><i><b style={{ width: `${task.progress}%` }} /></i>{task.progress}%</span> : <small><Clock3 size={12} /> {formatDate(task.createdAt)}</small>}
                 </div>
                 <div className="contract-task-actions">
-                  <button type="button" className={task.status === "queued" ? "primary" : "secondary"} disabled={busyTaskId === task.id} onClick={() => void openTask(task)}>
-                    {busyTaskId === task.id ? <span className="button-spinner" aria-hidden="true" /> : task.status === "queued" ? <Play size={14} /> : <ArrowRight size={14} />}
-                    {task.status === "queued" ? "开始审查" : task.status === "stored" ? "查看记录" : "进入工作台"}
+                  <button type="button" className={task.status === "preview" ? "primary" : "secondary"} disabled={busyTaskId === task.id} onClick={() => void openTask(task)}>
+                    {busyTaskId === task.id ? <span className="button-spinner" aria-hidden="true" /> : <ArrowRight size={14} />}
+                    {task.status === "preview" ? "打开合同" : task.status === "stored" ? "查看记录" : "进入工作台"}
                   </button>
                 </div>
               </div>

@@ -1,6 +1,5 @@
 import type { AuthApi } from "../features/auth";
 import type { ContractReviewApi } from "../features/contracts/application";
-import { mockContractReviewApi } from "../features/contracts/infrastructure";
 import type {
   ClassificationTaskPoolApi,
   ClassificationWorkflowApi,
@@ -15,14 +14,13 @@ import {
   MockKnowledgeApi,
   mockDocumentRepository,
 } from "../features/documents/infrastructure";
-import {
-  createDocumentId,
-  createIsoDateTime,
-  createUserId,
-} from "../features/documents/domain";
 import { ContinewAuthApi } from "../infrastructure/http/ContinewAuthApi";
 import { BusinessChatApi } from "../infrastructure/http/BusinessChatApi";
 import { BusinessReviewApi } from "../infrastructure/http/BusinessReviewApi";
+import {
+  AuthHttpAdapter,
+  ContractReviewHttpAdapter,
+} from "../infrastructure/http/adapters";
 import { HttpClient } from "../infrastructure/http/HttpClient";
 import { clearAccessToken, getAccessToken } from "../shared/lib/accessToken";
 
@@ -120,30 +118,35 @@ const classificationTasks = new MockClassificationTaskPoolApi(
 );
 const reviewTasks = businessReview;
 const knowledge = new MockKnowledgeApi(mockDocumentRepository);
-const contractReviewAdapter = mockContractReviewApi;
+const contractClient = new HttpClient({
+  baseUrl: "/proofspace-api/api/v1",
+});
+const contractReviewAdapter = new ContractReviewHttpAdapter(contractClient);
+
+/** ProofSpace uses an HttpOnly session cookie independently from ContiNew auth. */
+export const contractReviewAuth: AuthApi = new AuthHttpAdapter(contractClient);
+
+function unavailableContractFeature(): never {
+  throw new Error("当前阶段仅开放真实 DOCX 的 WPS 在线预览编辑");
+}
 
 const contractReview: ContractReviewApi = {
-  ...contractReviewAdapter,
-  async storeTask(taskId, options) {
-    const task = await contractReviewAdapter.storeTask(taskId, options);
-    mockDocumentRepository.upsert("knowledge", {
-      id: createDocumentId(`contract_knowledge_${task.id}`),
-      name: task.name,
-      type: "contract",
-      level: "company",
-      category: "contract",
-      state: {
-        kind: "published",
-        source: "contract-review",
-        contractTaskId: task.id,
-        publishedAt: createIsoDateTime(new Date().toISOString()),
-      },
-      operator: {
-        id: createUserId("current_user"),
-        displayName: "当前用户",
-      },
-    });
-    return task;
+  listTasks: (options) => contractReviewAdapter.listTasks(options),
+  getTask: (taskId, options) => contractReviewAdapter.getTask(taskId, options),
+  getEditorSession: (taskId, options) =>
+    contractReviewAdapter.getEditorSession(taskId, options),
+  createTask: (input, options) => contractReviewAdapter.createTask(input, options),
+  async startReview() {
+    return unavailableContractFeature();
+  },
+  async generateReport() {
+    return unavailableContractFeature();
+  },
+  async updateRisk() {
+    return unavailableContractFeature();
+  },
+  async storeTask() {
+    return unavailableContractFeature();
   },
 };
 

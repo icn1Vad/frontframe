@@ -1,0 +1,5 @@
+WPS WebOffice JSSDK: v1.1.27 Stable
+Source archive: web-office-sdk-solution-v1.1.27.zip
+Source archive SHA-256: e9cdfe22149fb1377a1c5d906d8ae2632e8f9719fdd341f6e7d94ebe55c0998e
+Runtime file: web-office-sdk-solution.umd.js
+Runtime file SHA-256: 815a2c447c85ea672714e2b26183bd862c83b1db88d33314e3b010c82be88343

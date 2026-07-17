@@ -1,17 +1,25 @@
 /** @type {import('next').NextConfig} */
 const apiBackendOrigin = process.env.API_BACKEND_ORIGIN?.replace(/\/+$/, "");
+const proofspaceBackendOrigin = process.env.PROOFSPACE_BACKEND_ORIGIN?.replace(/\/+$/, "");
 
 const nextConfig = {
   output: "standalone",
   reactStrictMode: true,
   async rewrites() {
-    if (!apiBackendOrigin) return [];
-    return [
-      {
+    const rules = [];
+    if (apiBackendOrigin) {
+      rules.push({
         source: "/api/v1/:path*",
         destination: `${apiBackendOrigin}/api/v1/:path*`,
-      },
-    ];
+      });
+    }
+    if (proofspaceBackendOrigin) {
+      rules.push({
+        source: "/proofspace-api/:path*",
+        destination: `${proofspaceBackendOrigin}/:path*`,
+      });
+    }
+    return rules;
   },
   async redirects() {
     return [
