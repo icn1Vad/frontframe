@@ -10,7 +10,7 @@ const fileId = process.env.WPS_WEB_OFFICE_FILE_ID?.trim()
   || "proofspace_demo_contract";
 const fileName = "测试合同.docx";
 const fileSize = 13_218;
-const demoUserId = "wps-demo-user";
+const demoUserId = "10001";
 
 function pathSegments(value: string | string[] | undefined): string[] {
   if (!value) return [];
