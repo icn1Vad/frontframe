@@ -1,0 +1,6 @@
+.git
+npm-debug.log*
+artifacts
+.env
+.env.*
+!/.env.example
