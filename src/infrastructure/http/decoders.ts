@@ -8,7 +8,7 @@ import {
   isContractEditorSession,
   type ContractReviewTask,
   type ContractRisk,
-} from "../../features/contracts";
+} from "../../features/contracts/domain";
 import type {
   BatchMutationResult,
   ClassificationCandidateStats,
@@ -578,7 +578,7 @@ export function decodeContractReviewTask(value: unknown): ContractReviewTask {
     ),
     status: oneOf(
       input.status,
-      ["queued", "reviewing", "reported", "stored"] as const,
+      ["preview", "queued", "reviewing", "reported", "stored"] as const,
       "contractReviewTask.status",
     ),
     progress: number(input.progress, "contractReviewTask.progress"),

@@ -35,6 +35,7 @@ function localWpsSession(taskId: string): ContractEditorSession | undefined {
       : undefined,
     endpoint: process.env.WPS_WEB_OFFICE_ENDPOINT?.trim() || undefined,
     mode: process.env.WPS_WEB_OFFICE_MODE === "simple" ? "simple" : "normal",
+    readonly: process.env.WPS_WEB_OFFICE_READONLY === "true",
     customArgs: { ps_task_id: taskId },
   };
 }

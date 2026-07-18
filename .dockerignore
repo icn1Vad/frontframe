@@ -1,0 +1,13 @@
+.git
+.github
+.next
+node_modules
+coverage
+*.log
+*.tmp
+*.tsbuildinfo
+*.patch
+docs
+openapi
+README.md
+.env*

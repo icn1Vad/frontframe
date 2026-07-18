@@ -56,6 +56,10 @@ export type DocumentState =
       readonly reviewTaskId: ReviewTaskId;
       readonly startedAt: IsoDateTime;
       readonly progress: ReviewProgress;
+      readonly reviewStatus?: "CREATED" | "RUNNING" | "FAILED";
+      readonly currentStage?: string;
+      readonly errorMessage?: string;
+      readonly retryable?: boolean;
     }
   | {
       readonly kind: "reviewed";
@@ -102,6 +106,7 @@ export interface UserSummary {
 
 export interface DocumentSummary {
   readonly id: DocumentId;
+  readonly fileId?: string;
   readonly name: string;
   readonly type: DocumentTypeCode;
   readonly level: DocumentLevelCode;

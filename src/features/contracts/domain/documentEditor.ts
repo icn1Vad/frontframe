@@ -24,15 +24,36 @@ export interface WpsTokenData {
   readonly timeout: number;
 }
 
+export interface WpsEditorUser {
+  readonly id: string;
+  readonly name: string;
+  readonly permission: "read" | "write";
+}
+
+export interface WpsDraftState {
+  readonly status: string;
+  readonly revision?: number;
+  readonly updatedAt?: string;
+}
+
 export interface WpsContractEditorSession {
   readonly provider: "wps";
   readonly sdkUrl: string;
   readonly appId: string;
   readonly fileId: string;
+  readonly documentId?: string;
+  readonly taskId?: string;
+  readonly documentVersionId?: string;
+  readonly officeType?: "writer";
+  readonly readonly: boolean;
+  readonly canFinalize?: boolean;
+  readonly draft?: WpsDraftState;
+  readonly currentUser?: WpsEditorUser;
   readonly token?: string | WpsTokenData;
+  readonly expiresAt?: string;
   readonly refreshTokenUrl?: string;
   readonly endpoint?: string;
-  readonly mode?: "normal" | "simple";
+  readonly mode?: "normal" | "nomal" | "simple";
   readonly customArgs?: Readonly<Record<string, string | number | boolean>>;
 }
 
@@ -50,6 +71,7 @@ export function isContractEditorSession(
   return (
     typeof candidate.sdkUrl === "string" &&
     typeof candidate.appId === "string" &&
-    typeof candidate.fileId === "string"
+    typeof candidate.fileId === "string" &&
+    typeof candidate.readonly === "boolean"
   );
 }

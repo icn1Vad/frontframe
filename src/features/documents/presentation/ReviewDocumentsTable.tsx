@@ -15,12 +15,15 @@ export const reviewDocumentColumns = createDocumentColumns({
   renderTime: (document) => {
     if (document.state.kind === "reviewing") {
       const progress = Math.min(100, Math.max(0, document.state.progress));
+      if (document.state.reviewStatus === "FAILED") {
+        return <strong title={document.state.errorMessage}>{document.state.errorMessage ?? "执行失败"}</strong>;
+      }
       return (
         <span className="review-progress">
           <i>
             <b style={{ width: `${progress}%` }} />
           </i>
-          {progress}%
+          {document.state.currentStage ?? `${progress}%`}
         </span>
       );
     }

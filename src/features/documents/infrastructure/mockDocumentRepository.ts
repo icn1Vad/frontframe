@@ -18,7 +18,8 @@ import {
   type ReviewTaskId,
 } from "../domain";
 
-const documentStorageKey = "proofspace.documents.v2";
+const documentStorageKey = "proofspace.documents.v3";
+const legacyDocumentStorageKey = "proofspace.documents.v2";
 
 const operatorZhang = {
   id: createUserId("user_zhang_san"),
@@ -198,6 +199,7 @@ function readStoredCollections():
   | Record<DocumentCollection, DocumentSummary[]>
   | undefined {
   if (typeof window === "undefined") return undefined;
+  window.localStorage.removeItem(legacyDocumentStorageKey);
   const stored = window.localStorage.getItem(documentStorageKey);
   if (!stored) return undefined;
   try {
@@ -378,4 +380,15 @@ export class MockDocumentRepository implements DocumentRepository {
   }
 }
 
-export const mockDocumentRepository = new MockDocumentRepository();
+const emptyDocumentCollections: Record<
+  DocumentCollection,
+  readonly DocumentSummary[]
+> = {
+  classification: [],
+  review: [],
+  knowledge: [],
+};
+
+export const mockDocumentRepository = new MockDocumentRepository(
+  emptyDocumentCollections,
+);

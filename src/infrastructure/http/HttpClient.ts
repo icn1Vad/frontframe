@@ -19,6 +19,7 @@ export interface HttpClientOptions {
   readonly initialCsrfToken?: string;
   readonly defaultHeaders?: Readonly<Record<string, string>>;
   readonly onUnauthorized?: () => void;
+  readonly getAccessToken?: () => string | undefined;
 }
 
 export interface HttpRequestOptions<T> {
@@ -57,10 +58,34 @@ async function readProblem(response: Response): Promise<ApiProblem> {
   if (!contentType.includes("json")) return fallback;
   try {
     const payload: unknown = await response.json();
-    return isApiProblem(payload) ? payload : fallback;
+    if (isApiProblem(payload)) return payload;
+    if (isApiEnvelope(payload)) return apiProblemFromEnvelope(payload, response);
+    return fallback;
   } catch {
     return fallback;
   }
+}
+
+function apiProblemFromEnvelope(
+  envelope: ApiEnvelope<unknown>,
+  response: Response,
+): ApiProblem {
+  const parsedStatus = Number.parseInt(envelope.code, 10);
+  return {
+    title: envelope.msg || "请求失败",
+    status: Number.isFinite(parsedStatus) ? parsedStatus : response.status || 400,
+    code: envelope.code || "BUSINESS_REQUEST_FAILED",
+    traceId: response.headers.get("x-trace-id") ?? undefined,
+  };
+}
+
+function isApiEnvelope(value: unknown): value is ApiEnvelope<unknown> {
+  if (!value || typeof value !== "object") return false;
+  const envelope = value as Partial<ApiEnvelope<unknown>>;
+  return typeof envelope.code === "string" &&
+    typeof envelope.msg === "string" &&
+    typeof envelope.success === "boolean" &&
+    "data" in envelope;
 }
 
 export class HttpClient {
@@ -69,13 +94,17 @@ export class HttpClient {
   private readonly defaultHeaders: Readonly<Record<string, string>>;
   private readonly onUnauthorized?: () => void;
   private csrfToken?: string;
+  private readonly getAccessToken?: () => string | undefined;
 
   constructor(options: HttpClientOptions = {}) {
     this.baseUrl = options.baseUrl ?? "/api/v1";
-    this.fetchImplementation = options.fetchImplementation ?? fetch;
+    this.fetchImplementation = options.fetchImplementation ?? (
+      globalThis.fetch.bind(globalThis)
+    );
     this.defaultHeaders = options.defaultHeaders ?? {};
     this.csrfToken = options.initialCsrfToken;
     this.onUnauthorized = options.onUnauthorized;
+    this.getAccessToken = options.getAccessToken;
   }
 
   setCsrfToken(token: string | undefined): void {
@@ -92,6 +121,10 @@ export class HttpClient {
       headers.set(name, value);
     }
     headers.set("Accept", "application/json");
+    const accessToken = this.getAccessToken?.();
+    if (accessToken) {
+      headers.set("Authorization", `Bearer ${accessToken}`);
+    }
     if (options.idempotencyKey) {
       headers.set("Idempotency-Key", options.idempotencyKey);
     }
@@ -123,17 +156,24 @@ export class HttpClient {
     const csrfToken = response.headers.get("x-csrf-token");
     if (csrfToken) this.setCsrfToken(csrfToken);
 
+    const contentType = response.headers.get("content-type") ?? "";
     if (!response.ok) {
       if (response.status === 401) this.onUnauthorized?.();
       throw new HttpApiError(await readProblem(response));
     }
     if (response.status === 204) return undefined as T;
-
-    const payload: unknown = await response.json();
-    if (!payload || typeof payload !== "object" || !("data" in payload)) {
-      throw new ResponseValidationError("接口响应缺少 data 字段");
+    if (!contentType.includes("json")) {
+      throw new ResponseValidationError("接口响应不是 JSON");
     }
-    const envelope = payload as ApiEnvelope<unknown>;
+    const payload: unknown = await response.json();
+    if (!isApiEnvelope(payload)) {
+      throw new ResponseValidationError("接口响应不符合 ContiNew R 结构");
+    }
+    const envelope = payload;
+    if (!envelope.success || envelope.code !== "0") {
+      if (envelope.code === "401") this.onUnauthorized?.();
+      throw new HttpApiError(apiProblemFromEnvelope(envelope, response));
+    }
     return options.decode
       ? options.decode(envelope.data)
       : (envelope.data as T);

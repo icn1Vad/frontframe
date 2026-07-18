@@ -1,3 +1,5 @@
+import { clearAccessToken } from "../shared/lib/accessToken";
+
 export interface AppSession {
   readonly user: {
     readonly displayName: string;
@@ -6,14 +8,15 @@ export interface AppSession {
   readonly signOut?: () => void;
 }
 
-/** Demo composition value. Replace this object when the authentication port is connected. */
-export const demoSession: AppSession = {
+/** Test/story fallback. Production pages receive a verified Java user session. */
+export const defaultSession: AppSession = {
   user: {
-    displayName: "张三",
-    roleLabel: "管理员",
+    displayName: "用户",
+    roleLabel: "已登录",
   },
   signOut() {
     if (typeof window !== "undefined") {
+      clearAccessToken();
       window.location.assign("/?auth=login#experience");
     }
   },

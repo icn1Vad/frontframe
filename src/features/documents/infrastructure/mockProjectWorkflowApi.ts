@@ -31,16 +31,18 @@ import {
   type ReviewTaskId,
 } from "../domain";
 import { MockDocumentRepository } from "./mockDocumentRepository";
+import { createIdempotencyKey } from "../../../shared/lib/idempotency";
 
 const operator = {
-  id: createUserId("user_zhang_san"),
-  displayName: "张三",
+  id: createUserId("current_user"),
+  displayName: "当前用户",
 } as const;
 
 const previewContent =
   "第十二条 审批权限：采购金额超过 500 万元时，由采购管理部提交董事会审议；紧急事项应在 3 个工作日内补充备案。";
 
-const reviewReportStorageKey = "proofspace.review-reports.v1";
+const reviewReportStorageKey = "proofspace.review-reports.v2";
+const legacyReviewReportStorageKey = "proofspace.review-reports.v1";
 
 const reviewRiskSeeds: readonly Omit<
   ReviewRisk,
@@ -208,10 +210,36 @@ function taskQuery(query: TaskPoolQuery, collection: "classification" | "review"
   return { ...query, collection } as const;
 }
 
+export interface UploadedBusinessDocument {
+  readonly fileId: string;
+  readonly fileName: string;
+}
+
+export interface CreatedBusinessReviewTask {
+  readonly taskId: string;
+  readonly status: "CREATED" | "RUNNING" | "SUCCEEDED" | "FAILED";
+  readonly progress: number;
+  readonly currentStage?: string;
+  readonly createdAt?: string;
+  readonly error?: { readonly message: string; readonly retryable: boolean } | null;
+}
+
+export type UploadPolicyDocument = (
+  file: File,
+  idempotencyKey: string,
+  signal?: AbortSignal,
+) => Promise<UploadedBusinessDocument>;
+
+export type CreateBusinessReviewTask = (
+  fileId: string,
+  idempotencyKey: string,
+  signal?: AbortSignal,
+) => Promise<CreatedBusinessReviewTask>;
+
 export class MockClassificationWorkflowApi
   implements ClassificationWorkflowApi
 {
-  private candidates = [...initialCandidates];
+  private candidates: ClassificationCandidateRecord[];
   private readonly confirmedRequests = new Map<
     string,
     BatchMutationResult<ConfirmedCandidateResult>
@@ -221,7 +249,13 @@ export class MockClassificationWorkflowApi
     BatchMutationResult<ClassificationCandidateRecord>
   >();
 
-  constructor(private readonly documents: MockDocumentRepository) {}
+  constructor(
+    private readonly documents: MockDocumentRepository,
+    candidates: readonly ClassificationCandidateRecord[] = initialCandidates,
+    private readonly uploadPolicyDocument?: UploadPolicyDocument,
+  ) {
+    this.candidates = [...candidates];
+  }
 
   /** Simulates an internal AI callback; it is intentionally not part of the browser API. */
   applyAiClassification(
@@ -290,17 +324,31 @@ export class MockClassificationWorkflowApi
     options: MutationOptions,
   ): Promise<readonly ClassificationCandidateRecord[]> {
     throwIfAborted(options);
-    const uploaded = files.map<ClassificationCandidateRecord>((file, index) => ({
-      id: createClassificationCandidateId(
-        `candidate_${Date.now()}_${index}_${file.name.replace(/[^a-zA-Z0-9]/g, "_")}`,
-      ),
-      name: file.name,
-      type: "other",
-      level: "company",
-      category: "administration",
-      state: "classifying",
-      version: 1,
-    }));
+    const uploaded = await Promise.all(files.map<Promise<ClassificationCandidateRecord>>(
+      async (file, index) => {
+        const businessDocument = this.uploadPolicyDocument
+          ? await this.uploadPolicyDocument(
+              file,
+              index === 0
+                ? options.idempotencyKey
+                : createIdempotencyKey("upload-policy-document"),
+              options.signal,
+            )
+          : undefined;
+        return {
+          id: createClassificationCandidateId(
+            `candidate_${Date.now()}_${index}_${file.name.replace(/[^a-zA-Z0-9]/g, "_")}`,
+          ),
+          ...(businessDocument ? { fileId: businessDocument.fileId } : {}),
+          name: businessDocument?.fileName ?? file.name,
+          type: "other",
+          level: "company",
+          category: "administration",
+          state: "classifying",
+          version: 1,
+        };
+      },
+    ));
     this.candidates.push(...uploaded);
     return uploaded;
   }
@@ -348,6 +396,7 @@ export class MockClassificationWorkflowApi
 
       const document: DocumentSummary = {
         id: createDocumentId(`doc_${input.id}`),
+        ...(candidate.fileId ? { fileId: candidate.fileId } : {}),
         name: input.name.trim(),
         type: input.type,
         level: input.level,
@@ -396,7 +445,10 @@ export class MockClassificationWorkflowApi
 export class MockClassificationTaskPoolApi
   implements ClassificationTaskPoolApi
 {
-  constructor(private readonly documents: MockDocumentRepository) {}
+  constructor(
+    private readonly documents: MockDocumentRepository,
+    private readonly createBusinessReviewTask?: CreateBusinessReviewTask,
+  ) {}
 
   list(query: TaskPoolQuery, options?: RepositoryRequestOptions) {
     return this.documents.list(taskQuery(query, "classification"), options);
@@ -431,14 +483,35 @@ export class MockClassificationTaskPoolApi
     if (current.state.kind !== "pending" && current.state.kind !== "classified") {
       throw new Error("只有待处理任务可以发起审查");
     }
-    const reviewTaskId = createReviewTaskId(`review_${documentId}_${Date.now()}`);
+    if (this.createBusinessReviewTask && !current.fileId) {
+      throw new Error("该任务没有真实 fileId，无法发起制度审校");
+    }
+    const businessTask = this.createBusinessReviewTask
+      ? await this.createBusinessReviewTask(
+          current.fileId as string,
+          options.idempotencyKey,
+          options.signal,
+        )
+      : undefined;
+    const reviewTaskId = createReviewTaskId(
+      businessTask?.taskId ?? `review_${documentId}_${Date.now()}`,
+    );
+    const startedAt = businessTask?.createdAt
+      ? createIsoDateTime(businessTask.createdAt)
+      : now();
     const updated: DocumentSummary = {
       ...current,
       state: {
         kind: "reviewing",
         reviewTaskId,
-        startedAt: now(),
-        progress: createReviewProgress(0),
+        startedAt,
+        progress: createReviewProgress(businessTask?.progress ?? 0),
+        ...(businessTask ? {
+          reviewStatus: businessTask.status === "SUCCEEDED" ? "RUNNING" : businessTask.status,
+          currentStage: businessTask.currentStage,
+          errorMessage: businessTask.error?.message,
+          retryable: businessTask.error?.retryable,
+        } : {}),
       },
     };
     this.documents.upsert("classification", updated);
@@ -482,6 +555,10 @@ export class MockReviewTaskPoolApi implements ReviewTaskPoolApi {
     throwIfAborted(options);
     const document = await this.documents.getByReviewTaskId(reviewTaskId, options);
     return document?.state.kind === "reviewing" ? document.state.progress : 100;
+  }
+
+  getTask(reviewTaskId: ReviewTaskId, options?: RepositoryRequestOptions) {
+    return this.documents.getByReviewTaskId(reviewTaskId, options);
   }
 
   async getReport(reviewTaskId: ReviewTaskId, options?: RepositoryRequestOptions) {
@@ -626,6 +703,7 @@ export class MockReviewTaskPoolApi implements ReviewTaskPoolApi {
 
   private readReport(reviewTaskId: ReviewTaskId): ReviewReport | undefined {
     if (typeof window !== "undefined") {
+      window.localStorage.removeItem(legacyReviewReportStorageKey);
       const stored = window.localStorage.getItem(reviewReportStorageKey);
       if (stored) {
         try {
@@ -643,6 +721,7 @@ export class MockReviewTaskPoolApi implements ReviewTaskPoolApi {
   private writeReport(report: ReviewReport): void {
     this.reports.set(report.taskId, report);
     if (typeof window === "undefined") return;
+    window.localStorage.removeItem(legacyReviewReportStorageKey);
     let reports: Record<string, ReviewReport> = {};
     const stored = window.localStorage.getItem(reviewReportStorageKey);
     if (stored) {

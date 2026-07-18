@@ -20,10 +20,23 @@ export const contractReviewStanceLabels: Record<ContractReviewStance, string> = 
 };
 
 export type ContractReviewTaskStatus =
+  | "preview"
   | "queued"
   | "reviewing"
   | "reported"
-  | "stored";
+  | "stored"
+  | "failed";
+
+export interface ContractReviewPolicyFile {
+  readonly fileId: string;
+  readonly fileName: string;
+}
+
+export interface ContractReviewTaskError {
+  readonly code: string;
+  readonly message: string;
+  readonly retryable: boolean;
+}
 
 export type ContractRiskLevel = "high" | "medium" | "low";
 export type ContractRiskState = "open" | "resolved" | "ignored";
@@ -64,6 +77,10 @@ export interface ContractReviewTask {
   readonly createdAt: string;
   readonly clauses: readonly ContractClause[];
   readonly risks: readonly ContractRisk[];
+  readonly contractFileId?: string;
+  readonly policies?: readonly ContractReviewPolicyFile[];
+  readonly currentStage?: string;
+  readonly error?: ContractReviewTaskError;
 }
 
 export interface CreateContractReviewTaskInput {

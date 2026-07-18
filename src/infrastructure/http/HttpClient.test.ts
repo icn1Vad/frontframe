@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { HttpApiError, ResponseValidationError } from "./errors";
 import { HttpClient } from "./HttpClient";
 
@@ -11,7 +11,32 @@ function jsonResponse(
   return new Response(JSON.stringify(body), { ...init, headers });
 }
 
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
 describe("HttpClient", () => {
+  it("binds the browser fetch implementation to the global receiver", async () => {
+    const browserFetch = vi.fn(function (this: typeof globalThis) {
+      if (this !== globalThis) {
+        throw new TypeError("Illegal invocation");
+      }
+      return Promise.resolve(jsonResponse({
+        code: "0",
+        msg: "操作成功",
+        success: true,
+        timestamp: 1784280600000,
+        data: { ok: true },
+      }));
+    });
+    vi.stubGlobal("fetch", browserFetch);
+    const client = new HttpClient({ baseUrl: "" });
+
+    await expect(client.request<{ ok: boolean }>("/captcha/image"))
+      .resolves.toEqual({ ok: true });
+    expect(browserFetch).toHaveBeenCalledOnce();
+  });
+
   it("uses cookie credentials, repeated query parameters and mutation headers", async () => {
     const fetchSpy = vi.fn(async (
       input: RequestInfo | URL,
@@ -20,7 +45,13 @@ describe("HttpClient", () => {
       void input;
       void init;
       return jsonResponse(
-        { data: { ok: true } },
+        {
+          code: "0",
+          msg: "操作成功",
+          success: true,
+          timestamp: 1784280600000,
+          data: { ok: true },
+        },
         { headers: { "X-CSRF-Token": "rotated-token" } },
       );
     });
@@ -77,6 +108,30 @@ describe("HttpClient", () => {
       traceId: "trace-001",
       retryable: false,
     } satisfies Partial<HttpApiError>);
+  });
+
+  it("uses the ContiNew message for non-2xx envelope responses", async () => {
+    const fetchImplementation = vi.fn(async () =>
+      jsonResponse(
+        {
+          code: "403",
+          msg: "没有创建问答会话的权限",
+          success: false,
+          timestamp: 1784280600000,
+          data: null,
+        },
+        { status: 403, headers: { "X-Trace-Id": "trace-403" } },
+      ),
+    ) as unknown as typeof fetch;
+    const client = new HttpClient({ fetchImplementation });
+
+    await expect(client.request("/business/chat/conversations"))
+      .rejects.toMatchObject({
+        message: "没有创建问答会话的权限",
+        status: 403,
+        code: "403",
+        traceId: "trace-403",
+      });
   });
 
   it("rejects successful responses that do not follow the data envelope", async () => {

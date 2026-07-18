@@ -1,0 +1,49 @@
+http://{$FRONTNEW_DOMAIN} {
+	encode zstd gzip
+
+	@notEdgeHttps {
+		not header X-Forwarded-Proto https
+	}
+	redir @notEdgeHttps https://{host}{uri} permanent
+
+	@continew path /business/* /api/v1/* /auth/* /captcha/* /system/* /user/* /tenant/* /monitor/* /dashboard*
+	handle @continew {
+		reverse_proxy continew-java:18000 {
+			flush_interval -1
+		}
+	}
+
+	handle {
+		reverse_proxy frontnew:3000
+	}
+
+	header {
+		-Server
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+}
+
+http://{$WPS_CALLBACK_DOMAIN} {
+	encode zstd gzip
+
+	@notEdgeHttps {
+		not header X-Forwarded-Proto https
+	}
+	redir @notEdgeHttps https://{host}{uri} permanent
+
+	@wpsCallback path /v3/3rd/* /proofspace/v3/3rd/*
+	handle @wpsCallback {
+		reverse_proxy frontnew:3000
+	}
+
+	handle {
+		respond "Not Found" 404
+	}
+
+	header {
+		-Server
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+	}
+}

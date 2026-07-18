@@ -5,9 +5,25 @@ import type {
   CreateContractReviewTaskInput,
 } from "../domain";
 
-export interface CreateContractReviewTaskCommand
-  extends CreateContractReviewTaskInput {
-  readonly file: File;
+export type CreateContractReviewTaskCommand = CreateContractReviewTaskInput & (
+  | {
+      readonly contractFileId: string;
+      readonly policyFileIds: readonly string[];
+      readonly file?: never;
+    }
+  | {
+      readonly file: File;
+      readonly contractFileId?: never;
+      readonly policyFileIds?: never;
+    }
+);
+
+export interface UploadedContractDocument {
+  readonly fileId: string;
+  readonly fileName: string;
+  readonly size: number;
+  readonly contentType: string;
+  readonly documentType: "CONTRACT" | "POLICY";
 }
 
 export interface ContractRequestOptions {
@@ -20,6 +36,11 @@ export interface ContractMutationOptions extends ContractRequestOptions {
 }
 
 export interface ContractReviewApi {
+  uploadDocument(
+    file: File,
+    documentType: "CONTRACT" | "POLICY",
+    options: ContractMutationOptions,
+  ): Promise<UploadedContractDocument>;
   listTasks(
     options?: ContractRequestOptions,
   ): Promise<readonly ContractReviewTask[]>;

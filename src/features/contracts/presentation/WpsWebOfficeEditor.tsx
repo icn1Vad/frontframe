@@ -108,7 +108,7 @@ export const WpsWebOfficeEditor = forwardRef<
         <div className="wps-editor-overlay" role="status">
           <LoaderCircle className="wps-editor-loader" size={26} />
           <strong>正在加载在线编辑器</strong>
-          <span>编辑器准备完成后将自动定位当前风险原文。</span>
+          <span>正在获取真实合同文件和编辑权限。</span>
         </div>
       ) : null}
       {state === "error" ? (

@@ -54,7 +54,7 @@ export function ContractReviewUploadScreen({
   const addFile = (file: File | undefined) => {
     if (!file) return;
     if (!isSupportedContract(file)) {
-      setFeedback("合同审查目前只接受文字文档或便携文档");
+      setFeedback("合同审查目前只支持 .docx 或 .pdf 文件");
       return;
     }
     setPendingFile({ name: file.name, size: file.size, file });
@@ -84,7 +84,7 @@ export function ContractReviewUploadScreen({
   const confirmTask = async () => {
     if (!pendingFile || !name.trim() || modules.length === 0) return;
     setSubmitting(true);
-    setFeedback(null);
+    setFeedback("正在上传合同并创建审查任务…");
     try {
       const createdTask = await api.createTask({
         file: pendingFile.file,
@@ -95,14 +95,12 @@ export function ContractReviewUploadScreen({
       }, {
         idempotencyKey: createIdempotencyKey("create-contract-review"),
       });
-      await api.startReview(createdTask.id, {
-        idempotencyKey: createIdempotencyKey("start-contract-review"),
-        expectedVersion: createdTask.version,
-      });
       await router.push(routes.contractReviewTask(createdTask.id));
     } catch (error) {
       setFeedback(
-        error instanceof Error ? `创建审查任务失败：${error.message}` : "创建审查任务失败，请稍后重试",
+        error instanceof Error
+          ? `开始审查失败：${error.message}`
+          : "开始审查失败，请稍后重试",
       );
     } finally {
       setSubmitting(false);
@@ -116,7 +114,7 @@ export function ContractReviewUploadScreen({
           <div>
             <div className="contract-eyebrow">合同专项审查</div>
             <h2>上传待审查合同</h2>
-            <p>用于条款级合同专项审查，可直接上传并配置审查范围，无需先进入文件分类流程。</p>
+            <p>用于条款级合同专项审查，可直接上传并配置审查偏向与范围，无需先进入文件分类流程。</p>
           </div>
           <button
             type="button"
@@ -145,12 +143,12 @@ export function ContractReviewUploadScreen({
           >
             <span className="contract-dropzone-icon"><UploadCloud size={30} /></span>
             <strong>将合同拖入这里，或点击选择文件</strong>
-            <small>支持文字文档和便携文档，单个文件最大 50 兆字节</small>
+            <small>支持 .docx 和 .pdf，单个文件最大 50 兆字节</small>
             <span className="secondary">选择合同文件</span>
           </button>
           <div className="contract-upload-note">
             <Settings2 size={16} />
-            <span>上传后可修改文件名称、审查偏向和检查模块，开始审查后直接进入合同审查工作台。</span>
+            <span>上传后可修改文件名称、审查偏向和审查范围，开始审查后直接进入合同审查工作台。</span>
           </div>
         </Surface>
         {feedback ? <p className="action-feedback error">{feedback}</p> : null}
@@ -164,7 +162,7 @@ export function ContractReviewUploadScreen({
         <div>
           <div className="contract-eyebrow">合同专项审查配置</div>
           <h2>确认合同审查配置</h2>
-          <p>开始后直接创建条款级合同审查任务并进入审查工作台，不经过文件分类任务池。</p>
+          <p>开始后直接创建合同审查任务并进入审查工作台，不经过文件分类任务池。</p>
         </div>
         <button
           type="button"
@@ -181,7 +179,7 @@ export function ContractReviewUploadScreen({
             <div className="contract-section-heading">
               <div>
                 <span className="contract-section-kicker">01 · 文件</span>
-                <h3>合同文件</h3>
+                <h3>待审查合同</h3>
               </div>
               <Status tone="success">已读取</Status>
             </div>
@@ -216,15 +214,18 @@ export function ContractReviewUploadScreen({
             </div>
             <label className="contract-field-label">
               <span>审查偏向</span>
-              <select value={stance} onChange={(event) => setStance(event.target.value as ContractReviewStance)}>
+              <select
+                value={stance}
+                onChange={(event) => setStance(event.target.value as ContractReviewStance)}
+              >
                 {Object.entries(contractReviewStanceLabels).map(([value, label]) => (
                   <option value={value} key={value}>{label}</option>
                 ))}
               </select>
             </label>
             <fieldset className="contract-module-fieldset">
-              <legend>合同审查模块</legend>
-              <p>至少选择一个模块，系统将只按选中的范围生成风险报告。</p>
+              <legend>审查范围</legend>
+              <p>至少选择一个范围，系统将只按选中的范围生成风险报告。</p>
               <div className="contract-module-options">
                 {contractReviewModuleDefinitions.map((module) => (
                   <label key={module.id} className="contract-module-option">
@@ -241,7 +242,7 @@ export function ContractReviewUploadScreen({
           </aside>
         </div>
         <div className="contract-confirm-footer">
-          <p>{feedback ?? `已选择 ${modules.length} 个检查模块，开始后直接进入审查工作台。`}</p>
+          <p>{feedback ?? `已选择 ${modules.length} 个审查范围，开始后直接进入审查工作台。`}</p>
           <button
             type="button"
             className="primary"

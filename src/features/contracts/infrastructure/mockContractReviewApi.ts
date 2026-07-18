@@ -8,7 +8,8 @@ import type {
 } from "../domain";
 import { isContractEditorSession } from "../domain";
 
-const storageKey = "proofspace.contract-review.tasks.v3";
+const storageKey = "proofspace.contract-review.tasks.v4";
+const legacyStorageKey = "proofspace.contract-review.tasks.v3";
 
 const clauses: readonly ContractClause[] = [
   {
@@ -112,6 +113,7 @@ function clone<T>(value: T): T {
 
 function readTasks(): ContractReviewTask[] {
   if (typeof window !== "undefined") {
+    window.localStorage.removeItem(legacyStorageKey);
     const stored = window.localStorage.getItem(storageKey);
     if (stored) {
       try {
@@ -164,24 +166,7 @@ function createTaskRecord(
   };
 }
 
-let memoryTasks: ContractReviewTask[] = [
-  createTaskRecord({
-    id: "contract-demo-001",
-    name: "软件技术服务合同.docx",
-    size: 248 * 1024,
-    stance: "neutral",
-    modules: [
-      "transaction",
-      "performance-payment",
-      "data-security",
-      "intellectual-property",
-      "termination",
-    ],
-    status: "reported",
-    progress: 100,
-    createdAt: "2026-07-15T08:30:00.000Z",
-  }),
-];
+let memoryTasks: ContractReviewTask[] = [];
 
 function updateTask(
   taskId: string,
@@ -203,6 +188,16 @@ function updateTask(
 }
 
 export const mockContractReviewApi: ContractReviewApi = {
+  async uploadDocument(file, documentType, options) {
+    options.signal?.throwIfAborted();
+    return {
+      fileId: `mock-${documentType.toLowerCase()}-${Date.now()}`,
+      fileName: file.name,
+      size: file.size,
+      contentType: file.type || "application/octet-stream",
+      documentType,
+    };
+  },
   async listTasks(options) {
     options?.signal?.throwIfAborted();
     return clone(
@@ -282,7 +277,7 @@ export const mockContractReviewApi: ContractReviewApi = {
                 ? { resolution: undefined }
                 : {
                     resolution: {
-                      operator: "张三",
+                      operator: "当前用户",
                       handledAt: new Date().toISOString(),
                       ...(reason ? { reason } : {}),
                     },

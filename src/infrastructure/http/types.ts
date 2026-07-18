@@ -16,8 +16,11 @@ export interface ApiProblem {
 }
 
 export interface ApiEnvelope<T> {
+  readonly code: string;
+  readonly msg: string;
+  readonly success: boolean;
+  readonly timestamp: number;
   readonly data: T;
-  readonly traceId?: string;
 }
 
 export type QueryValue =
