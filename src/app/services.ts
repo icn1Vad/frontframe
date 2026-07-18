@@ -135,10 +135,10 @@ const dashboard: DashboardApi = {
   async getOverview() {
     return {
       metrics: [
-        { label: "已入库制度", value: "0" },
-        { label: "已入库合同", value: "0" },
-        { label: "已入库报告", value: "0" },
-        { label: "已入库其他文件", value: "0" },
+        { label: "已入库制度", value: "8" },
+        { label: "已入库合同", value: "6" },
+        { label: "已入库报告", value: "5" },
+        { label: "已入库其他文件", value: "3" },
       ],
     };
   },
