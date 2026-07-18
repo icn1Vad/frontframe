@@ -121,13 +121,22 @@ export function ContractReviewWorkbenchScreen({
   useEffect(() => {
     let active = true;
     setLoading(true);
-    void Promise.all([api.getTask(taskId), api.getEditorSession(taskId)]).then(([
-      result,
-      session,
-    ]) => {
+    void Promise.allSettled([
+      api.getTask(taskId),
+      api.getEditorSession(taskId),
+    ]).then(([taskResult, sessionResult]) => {
       if (!active) return;
-      setEditorSession(session);
-      setEditorMode(session.provider === "wps" ? "wps" : "mock");
+      const session = sessionResult.status === "fulfilled"
+        ? sessionResult.value
+        : null;
+      if (session) {
+        setEditorSession(session);
+        setEditorMode(session.provider === "wps" ? "wps" : "mock");
+      }
+
+      const result = taskResult.status === "fulfilled"
+        ? taskResult.value
+        : null;
       if (result) {
         setTask(result);
         setProgress(result.progress);
@@ -141,12 +150,16 @@ export function ContractReviewWorkbenchScreen({
           },
         ]);
       }
-      setLoading(false);
-    }).catch((error: unknown) => {
-      if (active) {
-        setFeedback(error instanceof Error ? error.message : "合同或编辑会话加载失败");
-        setLoading(false);
+
+      if (!result && session?.provider !== "wps") {
+        const failure = taskResult.status === "rejected"
+          ? taskResult.reason
+          : sessionResult.status === "rejected"
+            ? sessionResult.reason
+            : null;
+        setFeedback(failure instanceof Error ? failure.message : "合同或编辑会话加载失败");
       }
+      setLoading(false);
     });
     return () => { active = false; };
   }, [api, taskId]);
