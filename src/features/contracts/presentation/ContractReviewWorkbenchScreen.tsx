@@ -312,6 +312,40 @@ export function ContractReviewWorkbenchScreen({
     return <PageStack><SurfaceLikeLoading /></PageStack>;
   }
 
+  if (!task && editorSession?.provider === "wps") {
+    return (
+      <PageStack className="contract-workbench-stack">
+        <header className="contract-workbench-header">
+          <div className="contract-workbench-title">
+            <Link href={routes.contractReview} className="contract-back-link">
+              <ArrowLeft size={14} /> 返回合同上传
+            </Link>
+            <div className="contract-eyebrow">合同专项审查工作台</div>
+            <div className="contract-title-line">
+              <FileText size={21} />
+              <h2>WPS WebOffice</h2>
+              <Status tone={wpsReady ? "success" : "info"}>
+                {wpsReady ? "已连接" : "正在连接"}
+              </Status>
+            </div>
+            <p>当前直接展示 WPS 在线文档，不依赖合同任务、制度文件或审查接口。</p>
+          </div>
+        </header>
+
+        {feedback ? <Status tone="danger">{feedback}</Status> : null}
+
+        <section className="contract-wps-only-panel" aria-label="WPS WebOffice 在线文档">
+          <WpsWebOfficeEditor
+            ref={wpsEditorRef}
+            session={editorSession}
+            onReadyChange={handleWpsReadyChange}
+            onError={handleWpsError}
+          />
+        </section>
+      </PageStack>
+    );
+  }
+
   if (!task) {
     return <PageStack><div className="contract-not-found"><FileText size={24} /><h2>合同审查任务不存在</h2><Link href={routes.contractReviewTasks} className="secondary">返回合同任务池</Link></div></PageStack>;
   }

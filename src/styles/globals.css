@@ -1549,6 +1549,8 @@ button:disabled { cursor: not-allowed; }
 .contract-document-signature { margin-top: 27px; color: #aaa097 !important; font-size: 10px !important; }
 .wps-editor-shell { position: relative; width: calc(100% - 32px); height: 640px; margin: 16px; overflow: hidden; background: #f6f3ee; border: 1px solid #e4dccf; border-radius: 7px; }
 .wps-editor-mount, .wps-editor-mount > iframe { width: 100% !important; height: 100% !important; border: 0; }
+.contract-wps-only-panel { min-width: 0; overflow: hidden; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow-sm); }
+.contract-wps-only-panel .wps-editor-shell { width: 100%; height: calc(100vh - 190px); min-height: 640px; margin: 0; border: 0; border-radius: 0; }
 .wps-editor-overlay { position: absolute; inset: 0; z-index: 2; padding: 28px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; color: var(--muted); background: rgba(250,248,244,.96); text-align: center; }
 .wps-editor-overlay strong { color: var(--text); font-size: 14px; }
 .wps-editor-overlay span { max-width: 380px; font-size: 11px; line-height: 1.6; font-weight: 500; }
