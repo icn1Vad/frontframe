@@ -351,12 +351,12 @@ export function ChatScreen({ api }: ChatScreenProps) {
                   {message.role === "user" ? "我" : "智"}
                 </b>
                 <div className="message-body">
-                  <div className="message-author">
-                    <strong>{message.role === "user" ? "你" : "制度助手"}</strong>
-                    {message.role === "assistant" ? (
+                  {message.role === "assistant" ? (
+                    <div className="message-author">
+                      <strong>制度助手</strong>
                       <Status tone="info">基于知识库</Status>
-                    ) : null}
-                  </div>
+                    </div>
+                  ) : null}
                   {message.role === "assistant" ? (
                     <AssistantAnswer
                       content={message.content}
@@ -373,7 +373,6 @@ export function ChatScreen({ api }: ChatScreenProps) {
                 <div className="message message-user">
                   <b className="avatar me">我</b>
                   <div className="message-body">
-                    <div className="message-author"><strong>你</strong></div>
                     <p>{activeStream.request.question}</p>
                   </div>
                 </div>

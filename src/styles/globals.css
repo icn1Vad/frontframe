@@ -369,9 +369,10 @@ h1, h2, h3, p { margin: 0; }
 .avatar { width: 32px; height: 32px; display: grid; place-items: center; color: #fff; border-radius: 50%; font-size: 11px; box-shadow: 0 3px 9px rgba(38,31,20,.1); }
 .avatar.me { background: #2a2a2a; }.avatar.ai { background: var(--primary); }
 .message p { max-width: 100%; margin-top: 10px; line-height: 1.7; overflow-wrap: anywhere; }
-.message-user .message-body { width: fit-content; max-width: min(720px, 100%); padding: 13px 16px; background: var(--muted-surface); border: 1px solid var(--border); border-radius: 4px 12px 12px; }
-.message-user .message-author { min-height: 18px; }
-.message-user p { margin-top: 7px; }
+.message-user { grid-template-columns: minmax(0, 1fr) 32px; }
+.message-user > .avatar { grid-column: 2; grid-row: 1; }
+.message-user > .message-body { width: fit-content; max-width: min(720px, 100%); padding: 12px 16px; grid-column: 1; grid-row: 1; justify-self: end; background: #f3e7d8; border: 1px solid #e3ceb5; border-radius: 12px 4px 12px 12px; }
+.message-user p { margin: 0; text-align: left; }
 .message-assistant { margin-top: 30px; }
 .message-assistant > .message-body > p { font-size: 13px; }
 .markdown-answer { max-width: 100%; margin-top: 10px; color: var(--text); font-size: 13px; line-height: 1.75; overflow-x: auto; overflow-wrap: anywhere; }
@@ -621,6 +622,7 @@ h1, h2, h3, p { margin: 0; }
   .chat-knowledge-scope { min-height: 28px; }
   .messages { padding: 22px 16px; }
   .message { grid-template-columns: 28px minmax(0, 1fr); gap: 9px; }
+  .message-user { grid-template-columns: minmax(0, 1fr) 28px; }
   .avatar { width: 28px; height: 28px; font-size: 10px; }
   .message-user .message-body { padding: 11px 12px; }
   .message-author { min-height: 28px; }
