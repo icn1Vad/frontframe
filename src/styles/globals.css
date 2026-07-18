@@ -373,6 +373,32 @@ h1, h2, h3, p { margin: 0; }
 .message-user p { margin-top: 7px; }
 .message-assistant { margin-top: 30px; }
 .message-assistant > .message-body > p { font-size: 13px; }
+.markdown-answer { max-width: 100%; margin-top: 10px; color: var(--text); font-size: 13px; line-height: 1.75; overflow-x: auto; overflow-wrap: anywhere; }
+.markdown-answer > :first-child { margin-top: 0; }
+.markdown-answer > :last-child { margin-bottom: 0; }
+.markdown-answer p { margin: 10px 0 0; line-height: inherit; }
+.markdown-answer h1, .markdown-answer h2, .markdown-answer h3, .markdown-answer h4, .markdown-answer h5, .markdown-answer h6 { margin: 22px 0 8px; color: var(--text); line-height: 1.35; }
+.markdown-answer h1 { font-size: 20px; }
+.markdown-answer h2 { padding-bottom: 7px; border-bottom: 1px solid var(--border); font-size: 18px; }
+.markdown-answer h3 { font-size: 16px; }
+.markdown-answer h4, .markdown-answer h5, .markdown-answer h6 { font-size: 14px; }
+.markdown-answer ul, .markdown-answer ol { margin: 10px 0 0; padding-left: 24px; }
+.markdown-answer li { margin: 5px 0; }
+.markdown-answer li > p { margin: 0; }
+.markdown-answer blockquote { margin: 14px 0 0; padding: 10px 14px; color: #6f5b45; background: #faf6ef; border-left: 3px solid var(--primary); border-radius: 0 8px 8px 0; }
+.markdown-answer blockquote > :first-child { margin-top: 0; }
+.markdown-answer code { padding: 2px 5px; color: #8a4e20; background: #f4eee6; border-radius: 4px; font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; font-size: .9em; }
+.markdown-answer pre { margin: 14px 0 0; padding: 14px 16px; color: #f7f2ea; background: #292723; border-radius: 9px; line-height: 1.65; overflow-x: auto; }
+.markdown-answer pre code { padding: 0; color: inherit; background: transparent; border-radius: 0; }
+.markdown-answer table { width: 100%; min-width: 520px; margin-top: 14px; border-collapse: collapse; font-size: 12px; }
+.markdown-answer th, .markdown-answer td { padding: 9px 11px; border: 1px solid var(--border); text-align: left; vertical-align: top; }
+.markdown-answer th { background: #f7f4ee; font-weight: 700; }
+.markdown-answer tr:nth-child(even) td { background: #fdfbf7; }
+.markdown-answer hr { margin: 20px 0; border: 0; border-top: 1px solid var(--border); }
+.markdown-answer a { color: #2f6f9f; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.markdown-answer a:hover { color: var(--primary); }
+.markdown-answer input[type="checkbox"] { width: 14px; height: 14px; margin-right: 6px; accent-color: var(--primary); }
+.markdown-image-placeholder { color: var(--muted); font-size: 12px; font-style: italic; }
 .chat-welcome { min-height: 320px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; color: var(--muted); text-align: center; }
 .chat-welcome strong { color: var(--text); font-size: 15px; }
 .chat-welcome p { margin: 0; }

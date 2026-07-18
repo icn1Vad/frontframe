@@ -8,6 +8,7 @@ import type {
 import { createIdempotencyKey } from "../../shared/lib/idempotency";
 import { IconButton, Status } from "../../shared/ui";
 import { ChatStreamError } from "./ChatStreamError";
+import { MarkdownAnswer } from "./MarkdownAnswer";
 
 export interface ChatScreenProps {
   readonly api: ChatApi;
@@ -291,7 +292,11 @@ export function ChatScreen({ api }: ChatScreenProps) {
                       <Status tone="info">基于知识库</Status>
                     ) : null}
                   </div>
-                  <p>{message.content}</p>
+                  {message.role === "assistant" ? (
+                    <MarkdownAnswer content={message.content} />
+                  ) : (
+                    <p>{message.content}</p>
+                  )}
                   {message.citations.length > 0 ? (
                     <div className="chat-sources" aria-label="回答引用来源">
                       {message.citations.map((citation, index) => (
@@ -328,7 +333,9 @@ export function ChatScreen({ api }: ChatScreenProps) {
                       <strong>制度助手</strong>
                       <Status tone="info">实时生成</Status>
                     </div>
-                    <p>{streamedContent || "正在检索正式知识库并整理回答…"}</p>
+                    <MarkdownAnswer
+                      content={streamedContent || "正在检索正式知识库并整理回答…"}
+                    />
                     {streamedCitations.length > 0 ? (
                       <div className="chat-sources" aria-label="实时回答引用来源">
                         {streamedCitations.map((citation, index) => (
