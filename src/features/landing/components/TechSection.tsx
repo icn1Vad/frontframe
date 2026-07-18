@@ -65,10 +65,10 @@ export function TechSection() {
       id="technology"
     >
       <div className="paper-noise" />
-      <div className="mx-auto grid w-full max-w-[1280px] items-center gap-10 lg:grid-cols-[1.02fr_0.98fr] lg:gap-12">
-        <div className="relative z-10">
+      <div className="mx-auto grid w-full max-w-[1280px] items-center gap-10 md:grid-cols-[minmax(0,1.02fr)_minmax(0,0.98fr)] md:gap-10 lg:gap-12">
+        <div className="relative z-10 min-w-0">
           <SectionTitle
-            className="[&_h2]:text-3xl md:[&_h2]:text-4xl"
+            className="landing-tech-title [&_h2]:text-3xl md:[&_h2]:text-4xl"
             eyebrow="技术架构"
             title={
               <>
@@ -107,7 +107,7 @@ export function TechSection() {
         </div>
 
         <motion.div
-          className="landing-tech-visual relative h-[390px] md:h-[560px] lg:h-[680px]"
+          className="landing-tech-visual relative min-w-0 h-[390px] md:h-[560px] lg:h-[680px]"
           initial={{ opacity: 0, x: 24 }}
           transition={{ duration: 0.85, ease: smoothEase }}
           viewport={{ once: true, amount: 0.25 }}

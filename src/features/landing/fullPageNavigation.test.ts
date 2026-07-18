@@ -4,6 +4,7 @@ import {
   clampSectionIndex,
   directionFromKey,
   normalizeWheelDelta,
+  resolveFullPageMode,
   sectionIndexAtViewportCenter,
   sectionIndexFromHash,
 } from "./fullPageNavigation";
@@ -32,6 +33,52 @@ describe("landing section indexes", () => {
     expect(sectionIndexAtViewportCenter(0, 800, sections)).toBe(0);
     expect(sectionIndexAtViewportCenter(900, 800, sections)).toBe(1);
     expect(sectionIndexAtViewportCenter(2100, 800, sections)).toBe(2);
+  });
+});
+
+describe("landing full-page mode", () => {
+  it("keeps strict navigation through desktop zoom breakpoints when content fits", () => {
+    expect(
+      resolveFullPageMode({
+        viewportWidth: 900,
+        viewportHeight: 760,
+        sectionHeights: [760, 764, 771],
+      }),
+    ).toBe("strict");
+  });
+
+  it("absorbs only small browser rounding differences", () => {
+    expect(
+      resolveFullPageMode({
+        viewportWidth: 1200,
+        viewportHeight: 800,
+        sectionHeights: [800, 812, 801],
+      }),
+    ).toBe("strict");
+    expect(
+      resolveFullPageMode({
+        viewportWidth: 1200,
+        viewportHeight: 800,
+        sectionHeights: [800, 813, 801],
+      }),
+    ).toBe("natural");
+  });
+
+  it("falls back to natural scrolling for narrow or overflowing layouts", () => {
+    expect(
+      resolveFullPageMode({
+        viewportWidth: 767,
+        viewportHeight: 800,
+        sectionHeights: [800, 800, 800],
+      }),
+    ).toBe("natural");
+    expect(
+      resolveFullPageMode({
+        viewportWidth: 1440,
+        viewportHeight: 800,
+        sectionHeights: [800, 920, 800],
+      }),
+    ).toBe("natural");
   });
 });
 

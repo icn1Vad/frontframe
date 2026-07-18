@@ -51,10 +51,10 @@ export function HeroSection() {
       id="product"
     >
       <div className="paper-noise" />
-      <div className="mx-auto grid w-full max-w-[1280px] items-start gap-10 lg:grid-cols-[0.92fr_1.08fr] lg:gap-12">
+      <div className="mx-auto grid w-full max-w-[1280px] items-start gap-10 md:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] md:gap-10 lg:gap-12">
         <motion.div
           animate="show"
-          className="relative z-10 max-w-3xl"
+          className="relative z-10 min-w-0 max-w-3xl"
           initial="hidden"
           variants={copyVariants}
         >
@@ -114,7 +114,7 @@ export function HeroSection() {
 
         <motion.div
           animate={{ opacity: 1, scale: 1 }}
-          className="landing-hero-visual relative h-[500px] overflow-visible md:h-[600px] lg:-mt-2 lg:h-[640px]"
+          className="landing-hero-visual relative min-w-0 h-[500px] overflow-visible md:-mt-2 md:h-[600px] lg:h-[640px]"
           initial={{ opacity: 0, scale: 0.96 }}
           transition={{ duration: 0.9, delay: 0.24, ease: smoothEase }}
         >

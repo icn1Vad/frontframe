@@ -7,6 +7,10 @@ export const LANDING_SECTIONS = [
 export type LandingSectionId = (typeof LANDING_SECTIONS)[number]["id"];
 export type LandingSectionIndex = 0 | 1 | 2;
 export type SectionDirection = -1 | 1 | "first" | "last";
+export type FullPageMode = "natural" | "strict";
+
+const STRICT_MODE_MIN_WIDTH = 768;
+const STRICT_MODE_HEIGHT_TOLERANCE = 12;
 
 export interface SectionMetric {
   readonly top: number;
@@ -16,6 +20,39 @@ export interface SectionMetric {
 export interface WheelAccumulation {
   readonly accumulated: number;
   readonly direction: -1 | 0 | 1;
+}
+
+export interface FullPageModeMetrics {
+  readonly viewportWidth: number;
+  readonly viewportHeight: number;
+  readonly sectionHeights: readonly number[];
+}
+
+/**
+ * Keep full-page navigation enabled while the content genuinely fits the
+ * viewport. A small tolerance absorbs sub-pixel/font rounding introduced by
+ * browser zoom without hiding content that actually needs natural scrolling.
+ */
+export function resolveFullPageMode({
+  viewportWidth,
+  viewportHeight,
+  sectionHeights,
+}: FullPageModeMetrics): FullPageMode {
+  const hasUsableViewport =
+    Number.isFinite(viewportWidth) &&
+    Number.isFinite(viewportHeight) &&
+    viewportWidth >= STRICT_MODE_MIN_WIDTH &&
+    viewportHeight > 0;
+  const hasEverySection = sectionHeights.length === LANDING_SECTIONS.length;
+  const sectionsFit = sectionHeights.every(
+    (height) =>
+      Number.isFinite(height) &&
+      height <= viewportHeight + STRICT_MODE_HEIGHT_TOLERANCE,
+  );
+
+  return hasUsableViewport && hasEverySection && sectionsFit
+    ? "strict"
+    : "natural";
 }
 
 export function clampSectionIndex(index: number): LandingSectionIndex {

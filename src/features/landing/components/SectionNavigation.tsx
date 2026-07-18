@@ -34,7 +34,10 @@ export function SectionNavigation({
             title={section.label}
             type="button"
           >
-            <span aria-hidden="true" />
+            <span aria-hidden="true" className="landing-section-dot-mark" />
+            <span aria-hidden="true" className="landing-section-dot-label">
+              {section.label}
+            </span>
           </button>
         );
       })}

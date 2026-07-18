@@ -13,7 +13,7 @@ export function ExperienceSection() {
       <div className="paper-noise" />
       <div className="mx-auto w-full max-w-[1280px]">
         <motion.div
-          className="landing-experience-grid grid gap-10 border-y border-line py-12 lg:grid-cols-[minmax(0,0.9fr)_minmax(430px,0.72fr)] lg:items-center lg:gap-16"
+          className="landing-experience-grid grid gap-10 border-y border-line py-12 md:grid-cols-[minmax(0,0.9fr)_minmax(360px,0.72fr)] md:items-center md:gap-10 lg:grid-cols-[minmax(0,0.9fr)_minmax(430px,0.72fr)] lg:gap-16"
           initial={{ opacity: 0, y: 22 }}
           transition={{ duration: 0.72, ease: smoothEase }}
           viewport={{ once: true, amount: 0.2 }}

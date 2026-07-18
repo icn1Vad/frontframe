@@ -11,14 +11,14 @@ import {
   accumulateWheelDelta,
   clampSectionIndex,
   directionFromKey,
+  type FullPageMode,
   LANDING_SECTIONS,
   type LandingSectionIndex,
   normalizeWheelDelta,
+  resolveFullPageMode,
   sectionIndexAtViewportCenter,
   sectionIndexFromHash,
 } from "../fullPageNavigation";
-
-type FullPageMode = "natural" | "strict";
 
 interface FullPageNavigation {
   readonly currentSection: LandingSectionIndex;
@@ -28,7 +28,7 @@ interface FullPageNavigation {
   readonly navigateToSection: (index: LandingSectionIndex) => void;
 }
 
-const ANIMATION_DURATION = 760;
+const ANIMATION_DURATION = 860;
 const WHEEL_RELEASE_DELAY = 150;
 const TOUCH_THRESHOLD = 52;
 
@@ -41,8 +41,10 @@ function isInteractiveTarget(target: EventTarget | null): boolean {
   );
 }
 
-function easeOutQuart(progress: number): number {
-  return 1 - Math.pow(1 - progress, 4);
+function easeInOutCubic(progress: number): number {
+  return progress < 0.5
+    ? 4 * progress * progress * progress
+    : 1 - Math.pow(-2 * progress + 2, 3) / 2;
 }
 
 function replaceSectionHash(index: LandingSectionIndex): void {
@@ -70,6 +72,8 @@ export function useFullPageNavigation(
   const animationFrameRef = useRef<number | null>(null);
   const scrollFrameRef = useRef<number | null>(null);
   const measureFrameRef = useRef<number | null>(null);
+  const alignFrameRef = useRef<number | null>(null);
+  const restoreFrameRef = useRef<number | null>(null);
   const wheelReleaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
@@ -93,11 +97,31 @@ export function useFullPageNavigation(
     ).filter((section): section is HTMLElement => section !== null);
   }, [containerRef]);
 
-  const setActiveSection = useCallback((index: LandingSectionIndex): void => {
-    currentSectionRef.current = index;
-    setCurrentSection(index);
-    replaceSectionHash(index);
-  }, []);
+  const setActiveSection = useCallback(
+    (index: LandingSectionIndex): void => {
+      const container = containerRef.current;
+      if (container) {
+        container.dataset.activeSection = LANDING_SECTIONS[index].id;
+      }
+      currentSectionRef.current = index;
+      setCurrentSection(index);
+      replaceSectionHash(index);
+    },
+    [containerRef],
+  );
+
+  const cancelActiveAnimation = useCallback((): void => {
+    if (animationFrameRef.current !== null) {
+      window.cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+    const container = containerRef.current;
+    container?.removeAttribute("data-section-animating");
+    if (isAnimatingRef.current) {
+      isAnimatingRef.current = false;
+      setIsAnimating(false);
+    }
+  }, [containerRef]);
 
   const finishAnimation = useCallback(
     (index: LandingSectionIndex, destination: number): void => {
@@ -144,7 +168,7 @@ export function useFullPageNavigation(
       const tick = (now: number): void => {
         const progress = Math.min(1, (now - startedAt) / ANIMATION_DURATION);
         container.scrollTop =
-          startTop + (destination - startTop) * easeOutQuart(progress);
+          startTop + (destination - startTop) * easeInOutCubic(progress);
 
         if (progress < 1) {
           animationFrameRef.current = window.requestAnimationFrame(tick);
@@ -164,24 +188,34 @@ export function useFullPageNavigation(
     ],
   );
 
-  const measureMode = useCallback((): void => {
+  const measureMode = useCallback((): FullPageMode | null => {
     const container = containerRef.current;
     const sections = sectionElements();
     if (!container || sections.length !== LANDING_SECTIONS.length) {
-      return;
+      return null;
     }
 
-    const nextMode: FullPageMode =
-      window.innerWidth >= 1024 &&
-      sections.every(
-        (section) => section.scrollHeight <= container.clientHeight + 1,
-      )
-        ? "strict"
-        : "natural";
+    const viewportHeight = container.clientHeight;
+    const viewportHeightValue = `${viewportHeight}px`;
+    if (
+      container.style.getPropertyValue("--landing-viewport-height") !==
+      viewportHeightValue
+    ) {
+      container.style.setProperty(
+        "--landing-viewport-height",
+        viewportHeightValue,
+      );
+    }
+    const nextMode = resolveFullPageMode({
+      viewportWidth: window.innerWidth,
+      viewportHeight,
+      sectionHeights: sections.map((section) => section.scrollHeight),
+    });
 
     modeRef.current = nextMode;
     container.dataset.fullpageMode = nextMode;
     setMode(nextMode);
+    return nextMode;
   }, [containerRef, sectionElements]);
 
   useEffect(() => {
@@ -196,11 +230,22 @@ export function useFullPageNavigation(
       }
       measureFrameRef.current = window.requestAnimationFrame(() => {
         measureFrameRef.current = null;
-        measureMode();
+        const previousMode = modeRef.current;
+        cancelActiveAnimation();
+        const nextMode = measureMode();
         const sections = sectionElements();
         const active = sections[currentSectionRef.current];
-        if (modeRef.current === "strict" && active) {
-          container.scrollTop = active.offsetTop;
+        if (
+          active &&
+          (nextMode === "strict" || previousMode === "strict")
+        ) {
+          if (alignFrameRef.current !== null) {
+            window.cancelAnimationFrame(alignFrameRef.current);
+          }
+          alignFrameRef.current = window.requestAnimationFrame(() => {
+            alignFrameRef.current = null;
+            container.scrollTop = active.offsetTop;
+          });
         }
       });
     };
@@ -213,17 +258,23 @@ export function useFullPageNavigation(
       resizeObserver.observe(authCard);
     }
     window.addEventListener("resize", scheduleMeasurement);
+    window.visualViewport?.addEventListener("resize", scheduleMeasurement);
     scheduleMeasurement();
 
     return () => {
       resizeObserver.disconnect();
       window.removeEventListener("resize", scheduleMeasurement);
+      window.visualViewport?.removeEventListener("resize", scheduleMeasurement);
       if (measureFrameRef.current !== null) {
         window.cancelAnimationFrame(measureFrameRef.current);
         measureFrameRef.current = null;
       }
+      if (alignFrameRef.current !== null) {
+        window.cancelAnimationFrame(alignFrameRef.current);
+        alignFrameRef.current = null;
+      }
     };
-  }, [containerRef, measureMode, sectionElements]);
+  }, [cancelActiveAnimation, containerRef, measureMode, sectionElements]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -414,15 +465,31 @@ export function useFullPageNavigation(
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("hashchange", handleHashChange);
 
-    const initialIndex = sectionIndexFromHash(window.location.hash) ?? 0;
-    const initialFrame = window.requestAnimationFrame(() => {
-      const sections = sectionElements();
-      const initialSection = sections[initialIndex];
-      if (initialSection) {
-        container.scrollTop = initialSection.offsetTop;
-        setActiveSection(initialIndex);
+    const previousScrollRestoration = window.history.scrollRestoration;
+    window.history.scrollRestoration = "manual";
+
+    const restorePosition = (): void => {
+      const index =
+        sectionIndexFromHash(window.location.hash) ?? currentSectionRef.current;
+      setActiveSection(index);
+      if (restoreFrameRef.current !== null) {
+        window.cancelAnimationFrame(restoreFrameRef.current);
       }
-    });
+      restoreFrameRef.current = window.requestAnimationFrame(() => {
+        restoreFrameRef.current = window.requestAnimationFrame(() => {
+          restoreFrameRef.current = null;
+          const section = sectionElements()[index];
+          if (section) {
+            container.scrollTop = section.offsetTop;
+          }
+        });
+      });
+    };
+
+    window.addEventListener("pageshow", restorePosition);
+    window.addEventListener("load", restorePosition);
+    restorePosition();
+    const restoreTimer = window.setTimeout(restorePosition, 160);
 
     return () => {
       container.removeEventListener("scroll", handleScroll);
@@ -432,9 +499,14 @@ export function useFullPageNavigation(
       container.removeEventListener("touchend", handleTouchEnd);
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("hashchange", handleHashChange);
-      window.cancelAnimationFrame(initialFrame);
-      if (animationFrameRef.current !== null) {
-        window.cancelAnimationFrame(animationFrameRef.current);
+      window.removeEventListener("pageshow", restorePosition);
+      window.removeEventListener("load", restorePosition);
+      window.clearTimeout(restoreTimer);
+      window.history.scrollRestoration = previousScrollRestoration;
+      cancelActiveAnimation();
+      if (restoreFrameRef.current !== null) {
+        window.cancelAnimationFrame(restoreFrameRef.current);
+        restoreFrameRef.current = null;
       }
       if (scrollFrameRef.current !== null) {
         window.cancelAnimationFrame(scrollFrameRef.current);
@@ -444,6 +516,7 @@ export function useFullPageNavigation(
       }
     };
   }, [
+    cancelActiveAnimation,
     containerRef,
     navigateToSection,
     sectionElements,
