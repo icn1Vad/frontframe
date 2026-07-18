@@ -8,7 +8,7 @@ export interface AppSession {
   readonly signOut?: () => void;
 }
 
-/** Fallback presentation until the authenticated user profile endpoint is connected. */
+/** Test/story fallback. Production pages receive a verified Java user session. */
 export const defaultSession: AppSession = {
   user: {
     displayName: "用户",

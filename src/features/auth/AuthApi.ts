@@ -25,8 +25,8 @@ export interface AuthUser {
 
 export interface AuthSession {
   readonly user: AuthUser;
-  readonly expiresAt: string;
-  readonly csrfToken: string;
+  readonly expiresAt?: string;
+  readonly csrfToken?: string;
 }
 
 export interface RegisterPayload {

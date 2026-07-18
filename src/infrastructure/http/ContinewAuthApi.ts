@@ -1,5 +1,6 @@
 import type {
   AuthApi,
+  AuthSession,
   LoginCaptcha,
   LoginPayload,
   RegisterPayload,
@@ -7,6 +8,7 @@ import type {
 } from "../../features/auth";
 import {
   clearAccessToken,
+  getAccessToken,
   setAccessToken,
 } from "../../shared/lib/accessToken";
 import { encryptContinewPassword } from "../../shared/lib/passwordEncryption";
@@ -14,6 +16,66 @@ import { ResponseValidationError } from "./errors";
 import { HttpClient } from "./HttpClient";
 
 const CONTINEW_CLIENT_ID = "ef51c9a3e9046c4f2ea45142c8a8344a";
+
+interface ContinewUserInfo {
+  readonly id: string;
+  readonly username: string;
+  readonly nickname: string;
+  readonly permissions: readonly string[];
+  readonly roles: readonly string[];
+  readonly roleNames: readonly string[];
+}
+
+function requiredString(
+  value: unknown,
+  field: string,
+): string {
+  if (typeof value !== "string" || !value.trim()) {
+    throw new ResponseValidationError(`用户信息缺少有效 ${field}`);
+  }
+  return value.trim();
+}
+
+function stringArray(value: unknown, field: string): readonly string[] {
+  if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
+    throw new ResponseValidationError(`用户信息 ${field} 字段无效`);
+  }
+  return value.map((item) => item.trim()).filter(Boolean);
+}
+
+function decodeUserInfo(value: unknown): ContinewUserInfo {
+  if (!value || typeof value !== "object") {
+    throw new ResponseValidationError("用户信息 data 必须是对象");
+  }
+  const input = value as Record<string, unknown>;
+  const id = typeof input.id === "number"
+    ? String(input.id)
+    : requiredString(input.id, "id");
+  const username = requiredString(input.username, "username");
+  const nickname = typeof input.nickname === "string" && input.nickname.trim()
+    ? input.nickname.trim()
+    : username;
+  return {
+    id,
+    username,
+    nickname,
+    permissions: stringArray(input.permissions, "permissions"),
+    roles: stringArray(input.roles, "roles"),
+    roleNames: stringArray(input.roleNames, "roleNames"),
+  };
+}
+
+function toAuthSession(user: ContinewUserInfo): AuthSession {
+  return {
+    user: {
+      id: user.id,
+      username: user.username,
+      displayName: user.nickname,
+      roleLabel: user.roleNames.join("、") || user.roles.join("、") || "已登录",
+      permissions: user.permissions,
+    },
+  };
+}
 
 function decodeLoginToken(value: unknown): string {
   if (!value || typeof value !== "object") {
@@ -48,6 +110,9 @@ function decodeCaptcha(value: unknown): LoginCaptcha {
 }
 
 export class ContinewAuthApi implements AuthApi {
+  private verifiedToken?: string;
+  private verifiedSession?: AuthSession;
+
   constructor(private readonly client: HttpClient) {}
 
   getCaptcha() {
@@ -73,10 +138,23 @@ export class ContinewAuthApi implements AuthApi {
       decode: decodeLoginToken,
     });
     setAccessToken(token);
-    return {
-      status: "authenticated" as const,
-      message: "登录成功，正在进入工作台。",
-    };
+    try {
+      const session = await this.loadSession(token);
+      if (session.user.username !== payload.username) {
+        throw new ResponseValidationError(
+          `登录身份不一致：输入账号为 ${payload.username}，Token 对应账号为 ${session.user.username}`,
+        );
+      }
+      return {
+        status: "authenticated" as const,
+        message: "身份验证成功，正在进入工作台。",
+        session,
+      };
+    } catch (error) {
+      this.clearVerifiedSession();
+      clearAccessToken();
+      throw error;
+    }
   }
 
   async register(payload: RegisterPayload): Promise<RegisterResult> {
@@ -87,11 +165,45 @@ export class ContinewAuthApi implements AuthApi {
     };
   }
 
-  async getSession() {
-    return null;
+  async getSession(): Promise<AuthSession | null> {
+    const token = getAccessToken();
+    if (!token) {
+      this.clearVerifiedSession();
+      return null;
+    }
+    if (token === this.verifiedToken && this.verifiedSession) {
+      return this.verifiedSession;
+    }
+    try {
+      return await this.loadSession(token);
+    } catch (error) {
+      this.clearVerifiedSession();
+      clearAccessToken();
+      throw error;
+    }
   }
 
   async logout() {
+    this.clearVerifiedSession();
     clearAccessToken();
+  }
+
+  private async loadSession(token: string): Promise<AuthSession> {
+    const user = await this.client.request<ContinewUserInfo>(
+      "/auth/user/info",
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        decode: decodeUserInfo,
+      },
+    );
+    const session = toAuthSession(user);
+    this.verifiedToken = token;
+    this.verifiedSession = session;
+    return session;
+  }
+
+  private clearVerifiedSession(): void {
+    this.verifiedToken = undefined;
+    this.verifiedSession = undefined;
   }
 }

@@ -431,6 +431,7 @@ h1, h2, h3, p { margin: 0; }
 .register-card label { margin-top: 14px; }.register-card > button { margin-top: 16px; }
 
 .error-page { min-height: 100vh; display: grid; place-items: center; background: var(--bg); }
+.auth-session-loading { min-height: 100vh; display: grid; place-items: center; color: var(--muted); background: var(--bg); font-size: 14px; font-weight: 600; }
 .error-page > div { width: min(520px, calc(100% - 32px)); min-height: 420px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
 .error-page > div > span { width: 88px; height: 88px; display: grid; place-items: center; color: var(--primary); background: #fff; border-radius: 50%; }
 .error-page h1 { margin-top: 22px; font-size: 42px; }.error-page p { margin: 8px 0 54px; }.error-page a { width: 180px; }
