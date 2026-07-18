@@ -86,7 +86,13 @@ export function ChatScreen({ api }: ChatScreenProps) {
       const conversation = await api.createConversation(undefined, {
         idempotencyKey: createIdempotencyKey("create-chat-conversation"),
       });
-      await loadConversations(conversation.id);
+      setConversations((current) => [
+        conversation,
+        ...current.filter((item) => item.id !== conversation.id),
+      ]);
+      setActiveId(conversation.id);
+      setActiveConversation(conversation);
+      setLoading(false);
       setFeedback("已新建提问集");
     } catch (error) {
       setFeedback(

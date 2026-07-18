@@ -108,4 +108,52 @@ describe("BusinessChatApi SSE", () => {
       "/business/chat/conversations/c1/messages",
     ]);
   });
+
+  it("创建会话时提交标题和幂等键并直接返回可展示会话", async () => {
+    const request = vi.fn().mockResolvedValue({
+      conversationId: "conversation-1",
+      title: "新建提问集",
+      createdAt: "2026-07-18 10:00:00",
+      updatedAt: "2026-07-18 10:00:00",
+    });
+    const api = new BusinessChatApi(
+      () => "token",
+      vi.fn(),
+      { request } as unknown as HttpClient,
+    );
+
+    const conversation = await api.createConversation(undefined, {
+      idempotencyKey: "idem-create-conversation",
+    });
+
+    expect(request).toHaveBeenCalledWith(
+      "/business/chat/conversations",
+      expect.objectContaining({
+        method: "POST",
+        body: { title: "新建提问集" },
+        idempotencyKey: "idem-create-conversation",
+      }),
+    );
+    expect(conversation).toMatchObject({
+      id: "conversation-1",
+      title: "新建提问集",
+      messages: [],
+    });
+  });
+
+  it("缺少登录令牌时不发送创建请求并返回明确提示", async () => {
+    const request = vi.fn();
+    const onUnauthorized = vi.fn();
+    const api = new BusinessChatApi(
+      () => undefined,
+      onUnauthorized,
+      { request } as unknown as HttpClient,
+    );
+
+    await expect(api.createConversation(undefined, {
+      idempotencyKey: "idem-no-token",
+    })).rejects.toThrow("登录状态已失效，请重新登录");
+    expect(onUnauthorized).toHaveBeenCalledOnce();
+    expect(request).not.toHaveBeenCalled();
+  });
 });

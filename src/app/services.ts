@@ -115,7 +115,10 @@ const classificationTasks = new MockClassificationTaskPoolApi(
 );
 const reviewTasks = businessReview;
 const knowledge = new MockKnowledgeApi(mockDocumentRepository);
-const contractReview: ContractReviewApi = new BusinessContractReviewApi(businessClient);
+const contractReview: ContractReviewApi = new BusinessContractReviewApi(
+  businessClient,
+  getAccessToken,
+);
 
 const dashboard: DashboardApi = {
   async getOverview() {

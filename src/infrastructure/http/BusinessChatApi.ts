@@ -132,7 +132,15 @@ export class BusinessChatApi implements ChatApi {
     private readonly client: HttpClient,
   ) {}
 
+  private requireAccessToken(): string {
+    const token = this.getAccessToken();
+    if (token) return token;
+    this.onUnauthorized();
+    throw new Error("登录状态已失效，请重新登录");
+  }
+
   async listConversations(): Promise<readonly ChatConversation[]> {
+    this.requireAccessToken();
     const data = await this.client.request<PageDto<ConversationDto>>(
       "/business/chat/conversations",
       { query: { page: 1, size: 100 } },
@@ -158,6 +166,7 @@ export class BusinessChatApi implements ChatApi {
     title: string | undefined,
     options: MutationOptions,
   ): Promise<ChatConversation> {
+    this.requireAccessToken();
     const conversation = await this.client.request<ConversationDto>(
       "/business/chat/conversations",
       {
@@ -172,6 +181,7 @@ export class BusinessChatApi implements ChatApi {
   }
 
   async deleteConversation(id: string, options: MutationOptions): Promise<void> {
+    this.requireAccessToken();
     await this.client.request<void>(
       `/business/chat/conversations/${encodeURIComponent(id)}`,
       { method: "DELETE", signal: options.signal },
@@ -187,11 +197,7 @@ export class BusinessChatApi implements ChatApi {
     const normalizedQuestion = question.trim();
     if (!normalizedQuestion) throw new Error("问题内容不能为空");
     if (normalizedQuestion.length > 4000) throw new Error("问题最多 4000 个字符");
-    const token = this.getAccessToken();
-    if (!token) {
-      this.onUnauthorized();
-      throw new Error("登录状态已失效，请重新登录");
-    }
+    const token = this.requireAccessToken();
     let response: Response;
     try {
       response = await fetch(

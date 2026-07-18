@@ -10,6 +10,7 @@ import {
   isContractEditorSession,
   type ContractEditorSession,
   type ContractReviewModuleId,
+  type ContractReviewStance,
   type ContractReviewTask,
   type ContractRisk,
   type ContractRiskState,
@@ -32,7 +33,7 @@ interface ContractTaskErrorDto {
 interface ContractTaskDto {
   readonly taskId: string;
   readonly contract: FileReferenceDto;
-  readonly policies: readonly FileReferenceDto[];
+  readonly policies?: readonly FileReferenceDto[];
   readonly status: BusinessContractStatus;
   readonly progress: number;
   readonly currentStage?: string | null;
@@ -78,6 +79,9 @@ interface PageDto<T> {
 }
 
 interface LocalTaskState {
+  readonly name?: string;
+  readonly stance?: ContractReviewStance;
+  readonly modules?: readonly ContractReviewModuleId[];
   readonly riskStates?: Readonly<Record<string, {
     readonly state: ContractRiskState;
     readonly reason?: string;
@@ -146,6 +150,9 @@ function applyLocalState(task: ContractReviewTask): ContractReviewTask {
   if (!state) return task;
   return {
     ...task,
+    name: state.name ?? task.name,
+    stance: state.stance ?? task.stance,
+    modules: state.modules ?? task.modules,
     status: state.stored && task.status === "reported" ? "stored" : task.status,
     risks: task.risks.map((risk) => {
       const localRisk = state.riskStates?.[risk.id];
@@ -180,30 +187,40 @@ function mapTask(dto: ContractTaskDto, result?: ContractResultDto): ContractRevi
   return applyLocalState({
     id: dto.taskId,
     version: Date.parse(normalizeDate(dto.updatedAt)) || 1,
-    name: dto.contract.fileName,
+    name: local?.name ?? dto.contract.fileName,
     size: 0,
-    stance: "neutral",
-    modules,
+    stance: local?.stance ?? "neutral",
+    modules: local?.modules ?? modules,
     status: taskStatus(dto.status, local?.stored),
     progress: Math.min(100, Math.max(0, dto.progress)),
     createdAt: normalizeDate(dto.createdAt),
     clauses,
     risks,
     contractFileId: dto.contract.fileId,
-    policies: dto.policies,
+    policies: dto.policies ?? [],
     currentStage: dto.currentStage ?? undefined,
     error: dto.error ?? undefined,
   });
 }
 
 export class BusinessContractReviewApi implements ContractReviewApi {
-  constructor(private readonly client: HttpClient) {}
+  constructor(
+    private readonly client: HttpClient,
+    private readonly getAccessToken?: () => string | undefined,
+  ) {}
+
+  private ensureAuthenticated(): void {
+    if (this.getAccessToken && !this.getAccessToken()) {
+      throw new Error("登录状态已失效，请重新登录");
+    }
+  }
 
   async uploadDocument(
     file: File,
     documentType: "CONTRACT" | "POLICY",
     options: ContractMutationOptions,
   ): Promise<UploadedContractDocument> {
+    this.ensureAuthenticated();
     const body = new FormData();
     body.append("file", file);
     body.append("documentType", documentType);
@@ -216,6 +233,7 @@ export class BusinessContractReviewApi implements ContractReviewApi {
   }
 
   async listTasks(options?: ContractRequestOptions): Promise<readonly ContractReviewTask[]> {
+    this.ensureAuthenticated();
     const data = await this.client.request<PageDto<ContractTaskDto>>(
       "/business/contract-reviews/tasks",
       { query: { page: 1, size: 100 }, signal: options?.signal },
@@ -224,6 +242,7 @@ export class BusinessContractReviewApi implements ContractReviewApi {
   }
 
   async getTask(taskId: string, options?: ContractRequestOptions): Promise<ContractReviewTask | undefined> {
+    this.ensureAuthenticated();
     const dto = await this.client.request<ContractTaskDto>(
       `/business/contract-reviews/tasks/${encodeURIComponent(taskId)}`,
       { signal: options?.signal },
@@ -255,15 +274,36 @@ export class BusinessContractReviewApi implements ContractReviewApi {
   }
 
   async createTask(input: CreateContractReviewTaskCommand, options: ContractMutationOptions) {
-    if (!("contractFileId" in input) || !input.contractFileId || !input.policyFileIds) {
-      throw new Error("Java 合同审查任务需要合同和制度文件标识");
-    }
+    this.ensureAuthenticated();
+    const uploaded = input.file
+      ? await this.uploadDocument(input.file, "CONTRACT", {
+          ...options,
+          idempotencyKey: `${options.idempotencyKey}:document`,
+        })
+      : undefined;
+    const contractFileId = uploaded?.fileId ?? input.contractFileId;
+    if (!contractFileId) throw new Error("合同文件上传后未返回 fileId");
+    const policyFileIds = input.policyFileIds ?? [];
     const dto = await this.client.request<ContractTaskDto>("/business/contract-reviews/tasks", {
       method: "POST",
-      body: { contractFileId: input.contractFileId, policyFileIds: input.policyFileIds },
+      body: {
+        contractFileId,
+        name: input.name,
+        stance: input.stance,
+        modules: input.modules,
+        ...(policyFileIds.length > 0 ? { policyFileIds } : {}),
+      },
       idempotencyKey: options.idempotencyKey,
       signal: options.signal,
     });
+    const states = readLocalState();
+    states[dto.taskId] = {
+      ...states[dto.taskId],
+      name: input.name,
+      stance: input.stance,
+      modules: [...input.modules],
+    };
+    writeLocalState(states);
     return mapTask(dto);
   }
 

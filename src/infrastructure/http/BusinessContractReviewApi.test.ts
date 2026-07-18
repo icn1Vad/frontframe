@@ -17,7 +17,7 @@ const succeededTask = {
 };
 
 describe("BusinessContractReviewApi", () => {
-  it("创建任务时只提交 Java 约定的合同和制度 fileId", async () => {
+  it("兼容使用已上传的合同和制度 fileId 创建任务", async () => {
     const request = vi.fn().mockResolvedValue({ ...succeededTask, status: "CREATED", progress: 0 });
     const api = new BusinessContractReviewApi({ request } as unknown as HttpClient);
 
@@ -32,9 +32,63 @@ describe("BusinessContractReviewApi", () => {
 
     expect(request).toHaveBeenCalledWith("/business/contract-reviews/tasks", expect.objectContaining({
       method: "POST",
-      body: { contractFileId: "contract-file", policyFileIds: ["policy-1", "policy-2"] },
+      body: expect.objectContaining({
+        contractFileId: "contract-file",
+        policyFileIds: ["policy-1", "policy-2"],
+      }),
       idempotencyKey: "idem-create",
     }));
+  });
+
+  it("单合同流程先上传 CONTRACT，再提交审查偏向和范围且不上传制度", async () => {
+    const request = vi.fn()
+      .mockResolvedValueOnce({
+        fileId: "uploaded-contract",
+        fileName: "采购合同.docx",
+        size: 4,
+        contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        documentType: "CONTRACT",
+      })
+      .mockResolvedValueOnce({
+        ...succeededTask,
+        contract: { fileId: "uploaded-contract", fileName: "采购合同.docx" },
+        policies: undefined,
+        status: "CREATED",
+        progress: 0,
+      });
+    const api = new BusinessContractReviewApi({ request } as unknown as HttpClient);
+
+    await api.createTask({
+      file: new File(["docx"], "采购合同.docx"),
+      name: "采购合同（甲方）.docx",
+      size: 4,
+      stance: "party-a",
+      modules: ["transaction", "termination"],
+    }, { idempotencyKey: "idem-single-contract" });
+
+    expect(request).toHaveBeenCalledTimes(2);
+    const [uploadPath, uploadOptions] = request.mock.calls[0];
+    expect(uploadPath).toBe("/business/documents");
+    expect(uploadOptions).toMatchObject({
+      method: "POST",
+      idempotencyKey: "idem-single-contract:document",
+    });
+    expect(uploadOptions.body).toBeInstanceOf(FormData);
+    expect(uploadOptions.body.get("documentType")).toBe("CONTRACT");
+
+    expect(request.mock.calls[1]).toEqual([
+      "/business/contract-reviews/tasks",
+      expect.objectContaining({
+        method: "POST",
+        idempotencyKey: "idem-single-contract",
+        body: {
+          contractFileId: "uploaded-contract",
+          name: "采购合同（甲方）.docx",
+          stance: "party-a",
+          modules: ["transaction", "termination"],
+        },
+      }),
+    ]);
   });
 
   it("成功任务按 taskId 查询结果并映射制度依据和风险", async () => {
