@@ -3,7 +3,9 @@ import type {
   ChatCitation,
   ChatConversation,
   ChatMessage,
+  ChatStreamContent,
   ChatStreamHandlers,
+  ChatStreamMeta,
 } from "../../app/services";
 import { ChatStreamError } from "../../features/chat/ChatStreamError";
 import type { MutationOptions } from "../../features/documents/application";
@@ -17,9 +19,9 @@ interface ConversationDto {
 }
 
 interface CitationDto {
-  readonly sourceId: string;
-  readonly sourceName: string;
-  readonly location?: string;
+  readonly sourceId: string | null;
+  readonly sourceName: string | null;
+  readonly location?: string | null;
   readonly excerpt: string | null;
 }
 
@@ -40,6 +42,20 @@ interface SseEvent {
   readonly event: string;
   readonly data: string;
 }
+
+interface DoneEvent {
+  readonly messageId: string;
+  readonly sequence: number;
+  readonly resumed: boolean;
+}
+
+interface ErrorEvent {
+  readonly errorCode: string;
+  readonly errorMessage: string;
+  readonly retryable: boolean;
+}
+
+export const CHAT_STREAM_TIMEOUT_MS = 180_000;
 
 function mapCitation(citation: CitationDto): ChatCitation {
   return {
@@ -119,8 +135,25 @@ function parseJson<T>(value: string, event: string): T {
   try {
     return JSON.parse(value) as T;
   } catch {
-    throw new Error(`无法解析 SSE ${event} 事件`);
+    throw new ChatStreamError(
+      `无法解析 SSE ${event} 事件`,
+      false,
+      "CHAT_STREAM_PROTOCOL_ERROR",
+    );
   }
+}
+
+function isRetryableHttpStatus(status: number): boolean {
+  return [408, 425, 429, 500, 502, 503, 504].includes(status);
+}
+
+function citationFingerprint(citation: ChatCitation): string {
+  return [
+    citation.documentId,
+    citation.documentName,
+    citation.location,
+    citation.excerpt,
+  ].map((value) => value?.trim() ?? "").join("\u001f");
 }
 
 export class BusinessChatApi implements ChatApi {
@@ -198,14 +231,23 @@ export class BusinessChatApi implements ChatApi {
     if (!normalizedQuestion) throw new Error("问题内容不能为空");
     if (normalizedQuestion.length > 4000) throw new Error("问题最多 4000 个字符");
     const token = this.requireAccessToken();
-    let response: Response;
+    const controller = new AbortController();
+    let timedOut = false;
+    const timeoutId = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, CHAT_STREAM_TIMEOUT_MS);
+    const abortFromCaller = () => controller.abort(options.signal?.reason);
+    if (options.signal?.aborted) abortFromCaller();
+    else options.signal?.addEventListener("abort", abortFromCaller, { once: true });
+
     try {
-      response = await fetch(
+      const response = await fetch(
         `/api/continew/business/chat/conversations/${encodeURIComponent(conversationId)}/messages/stream`,
         {
           method: "POST",
           credentials: "include",
-          signal: options.signal,
+          signal: controller.signal,
           headers: {
             Accept: "text/event-stream",
             Authorization: `Bearer ${token}`,
@@ -215,85 +257,118 @@ export class BusinessChatApi implements ChatApi {
           body: JSON.stringify({ content: normalizedQuestion }),
         },
       );
-    } catch (error) {
-      throw new ChatStreamError(
-        error instanceof Error ? error.message : "流式问答连接失败",
-        true,
-        "CHAT_STREAM_CONNECTION_FAILED",
-      );
-    }
-    const contentType = response.headers.get("content-type") ?? "";
-    if (!response.ok || !contentType.includes("text/event-stream")) {
-      const payload = await response.json().catch(() => null) as {
-        readonly code?: string;
-        readonly msg?: string;
-      } | null;
-      if (response.status === 401 || payload?.code === "401") this.onUnauthorized();
-      throw new Error(payload?.msg || `流式问答请求失败（${response.status}）`);
-    }
+      const contentType = response.headers.get("content-type") ?? "";
+      if (!response.ok || !contentType.includes("text/event-stream")) {
+        const payload = await response.json().catch(() => null) as {
+          readonly code?: string;
+          readonly msg?: string;
+        } | null;
+        if (response.status === 401 || payload?.code === "401") this.onUnauthorized();
+        throw new ChatStreamError(
+          payload?.msg || `流式问答请求失败（${response.status}）`,
+          response.ok ? false : isRetryableHttpStatus(response.status),
+          payload?.code || `HTTP_${response.status}`,
+        );
+      }
 
-    let messageId = `stream-${Date.now()}`;
-    let content = "";
-    const citations: ChatCitation[] = [];
-    let finished = false;
-    try {
+      let messageId = `stream-${Date.now()}`;
+      let content = "";
+      const citations: ChatCitation[] = [];
+      const citationKeys = new Set<string>();
+      let lastContentSequence = -1;
+      let finished = false;
+
       await consumeSse(response, ({ event, data }) => {
         if (event === "meta") {
-        const meta = parseJson<{
-          requestId: string;
-          conversationId: string;
-          messageId: string;
-        }>(data, event);
-        messageId = meta.messageId;
-        options.onMeta?.(meta);
-        return "continue";
-      } else if (event === "delta") {
-        const delta = parseJson<{ content: string }>(data, event);
-        content += delta.content;
-        options.onDelta?.(delta.content);
-        return "continue";
-      } else if (event === "citation") {
-        const citation = mapCitation(
-          parseJson<{ citation: CitationDto }>(data, event).citation,
-        );
-        citations.push(citation);
-        options.onCitation?.(citation);
-        return "continue";
-      } else if (event === "done") {
-        messageId = parseJson<{ messageId: string }>(data, event).messageId;
-        finished = true;
-        return "stop";
-      } else if (event === "error") {
-        const error = parseJson<{
-          errorCode: string;
-          errorMessage: string;
-          retryable: boolean;
-        }>(data, event);
-        throw new ChatStreamError(error.errorMessage, error.retryable, error.errorCode);
+          const meta = parseJson<ChatStreamMeta>(data, event);
+          messageId = meta.messageId;
+          options.onMeta?.(meta);
+          return "continue";
+        }
+        if (event === "snapshot") {
+          const snapshot = parseJson<ChatStreamContent>(data, event);
+          if (snapshot.sequence < lastContentSequence) return "continue";
+          lastContentSequence = snapshot.sequence;
+          content = snapshot.content;
+          options.onSnapshot?.(snapshot);
+          return "continue";
+        }
+        if (event === "delta") {
+          const delta = parseJson<ChatStreamContent>(data, event);
+          if (delta.sequence <= lastContentSequence) return "continue";
+          lastContentSequence = delta.sequence;
+          content += delta.content;
+          options.onDelta?.(delta);
+          return "continue";
+        }
+        if (event === "citation") {
+          const citation = mapCitation(
+            parseJson<{ citation: CitationDto }>(data, event).citation,
+          );
+          const key = citationFingerprint(citation);
+          if (!citationKeys.has(key)) {
+            citationKeys.add(key);
+            citations.push(citation);
+            options.onCitation?.(citation);
+          }
+          return "continue";
+        }
+        if (event === "done") {
+          messageId = parseJson<DoneEvent>(data, event).messageId;
+          finished = true;
+          return "stop";
+        }
+        if (event === "error") {
+          const streamError = parseJson<ErrorEvent>(data, event);
+          throw new ChatStreamError(
+            streamError.errorMessage,
+            streamError.retryable,
+            streamError.errorCode,
+          );
         }
         return "continue";
       });
+
+      if (!finished) {
+        throw new ChatStreamError(
+          "流式回答在 done 事件前中断",
+          true,
+          "CHAT_STREAM_INTERRUPTED",
+        );
+      }
+      return {
+        id: messageId,
+        role: "assistant",
+        content,
+        createdAt: new Date().toISOString(),
+        citations,
+      };
     } catch (error) {
       if (error instanceof ChatStreamError) throw error;
+      if (timedOut) {
+        throw new ChatStreamError(
+          "回答等待超过 180 秒",
+          true,
+          "CHAT_STREAM_TIMEOUT",
+        );
+      }
+      if (options.signal?.aborted) {
+        throw new ChatStreamError(
+          "流式问答已取消",
+          false,
+          "CHAT_STREAM_CANCELLED",
+        );
+      }
       throw new ChatStreamError(
-        error instanceof Error ? error.message : "流式回答读取中断",
+        error instanceof Error && error.name !== "AbortError"
+          ? error.message
+          : "流式回答连接中断",
         true,
         "CHAT_STREAM_INTERRUPTED",
       );
+    } finally {
+      clearTimeout(timeoutId);
+      options.signal?.removeEventListener("abort", abortFromCaller);
     }
-    if (!finished) {
-      throw new ChatStreamError(
-        "流式回答在 done 事件前中断",
-        true,
-        "CHAT_STREAM_INTERRUPTED",
-      );
-    }
-    return {
-      id: messageId,
-      role: "assistant",
-      content,
-      createdAt: new Date().toISOString(),
-      citations,
-    };
   }
 }

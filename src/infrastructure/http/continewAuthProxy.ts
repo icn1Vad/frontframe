@@ -5,6 +5,7 @@ export type ProxyHeaderSource = Readonly<
 const exactRoutes = new Map<string, string>([
   ["GET captcha/image", "/captcha/image"],
   ["POST auth/login", "/auth/login"],
+  ["GET auth/user/info", "/auth/user/info"],
   ["POST business/documents", "/business/documents"],
   ["GET business/review/tasks", "/business/review/tasks"],
   ["POST business/review/tasks", "/business/review/tasks"],

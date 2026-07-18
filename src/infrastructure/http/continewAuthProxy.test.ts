@@ -10,6 +10,8 @@ describe("continewAuthProxy", () => {
       .toBe("/captcha/image");
     expect(resolveContinewProxyRoute(["auth", "login"], "POST"))
       .toBe("/auth/login");
+    expect(resolveContinewProxyRoute(["auth", "user", "info"], "GET"))
+      .toBe("/auth/user/info");
     expect(resolveContinewProxyRoute(["business", "documents"], "POST"))
       .toBe("/business/documents");
     expect(resolveContinewProxyRoute(

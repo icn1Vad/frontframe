@@ -33,19 +33,30 @@ export interface DashboardApi {
 }
 
 export interface ChatCitation {
-  readonly documentId: string;
-  readonly documentName: string;
-  readonly location?: string;
+  readonly documentId: string | null;
+  readonly documentName: string | null;
+  readonly location?: string | null;
   readonly excerpt: string | null;
 }
 
+export interface ChatStreamMeta {
+  readonly requestId: string;
+  readonly conversationId: string;
+  readonly messageId: string;
+  readonly sequence: number;
+  readonly resumed: boolean;
+}
+
+export interface ChatStreamContent {
+  readonly content: string;
+  readonly sequence: number;
+  readonly resumed: boolean;
+}
+
 export interface ChatStreamHandlers {
-  readonly onMeta?: (meta: {
-    readonly requestId: string;
-    readonly conversationId: string;
-    readonly messageId: string;
-  }) => void;
-  readonly onDelta?: (content: string) => void;
+  readonly onMeta?: (meta: ChatStreamMeta) => void;
+  readonly onSnapshot?: (snapshot: ChatStreamContent) => void;
+  readonly onDelta?: (delta: ChatStreamContent) => void;
   readonly onCitation?: (citation: ChatCitation) => void;
 }
 

@@ -95,7 +95,7 @@ describe("ContinewAuthApi", () => {
       "token-value",
     );
     const [userInfoUrl, userInfoRequest] = fetchMock.mock.calls[1]!;
-    expect(userInfoUrl).toBe("/auth/user/info");
+    expect(userInfoUrl).toBe("/api/continew/auth/user/info");
     expect(new Headers(userInfoRequest?.headers).get("Authorization"))
       .toBe("Bearer token-value");
   });

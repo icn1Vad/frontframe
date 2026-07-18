@@ -190,7 +190,7 @@ export class ContinewAuthApi implements AuthApi {
 
   private async loadSession(token: string): Promise<AuthSession> {
     const user = await this.client.request<ContinewUserInfo>(
-      "/auth/user/info",
+      "/api/continew/auth/user/info",
       {
         headers: { Authorization: `Bearer ${token}` },
         decode: decodeUserInfo,

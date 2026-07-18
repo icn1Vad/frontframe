@@ -51,7 +51,16 @@ function copyResponseHeaders(
     const value = headers[name];
     if (value !== undefined) response.setHeader(name, value);
   }
-  if (!headers["cache-control"]) response.setHeader("Cache-Control", "no-store");
+  const contentType = headers["content-type"];
+  const isEventStream = typeof contentType === "string"
+    && contentType.toLowerCase().includes("text/event-stream");
+  if (isEventStream) {
+    response.removeHeader("content-length");
+    response.setHeader("Cache-Control", "no-cache, no-transform");
+    response.setHeader("X-Accel-Buffering", "no");
+  } else if (!headers["cache-control"]) {
+    response.setHeader("Cache-Control", "no-store");
+  }
 }
 
 export default function handler(
@@ -89,6 +98,7 @@ export default function handler(
   }, (upstreamResponse) => {
     response.statusCode = upstreamResponse.statusCode ?? 502;
     copyResponseHeaders(upstreamResponse.headers, response);
+    response.flushHeaders();
     upstreamResponse.on("error", () => response.destroy());
     response.once("close", () => upstreamResponse.destroy());
     upstreamResponse.pipe(response);

@@ -1,23 +1,25 @@
-import { BookOpen, Plus, RotateCcw, Send, Trash2 } from "lucide-react";
+import { BookOpen, Plus, Send, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import type {
   ChatApi,
-  ChatCitation,
   ChatConversation,
 } from "../../app/services";
 import { createIdempotencyKey } from "../../shared/lib/idempotency";
 import { IconButton, Status } from "../../shared/ui";
 import { ChatStreamError } from "./ChatStreamError";
-import { MarkdownAnswer } from "./MarkdownAnswer";
+import {
+  areConversationControlsLocked,
+  chatStreamReducer,
+  createActiveChatStream,
+  shouldAutoRecover,
+  type ActiveChatStream,
+  type ChatStreamAction,
+  type ChatStreamRequest,
+} from "./chatStreamState";
+import { AssistantAnswer, StreamingAnswer } from "./StreamingAnswer";
 
 export interface ChatScreenProps {
   readonly api: ChatApi;
-}
-
-interface RetryRequest {
-  readonly conversationId: string;
-  readonly question: string;
-  readonly idempotencyKey: string;
 }
 
 export function ChatScreen({ api }: ChatScreenProps) {
@@ -29,11 +31,16 @@ export function ChatScreen({ api }: ChatScreenProps) {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
-  const [pendingQuestion, setPendingQuestion] = useState<string | null>(null);
-  const [streamedContent, setStreamedContent] = useState("");
-  const [streamedCitations, setStreamedCitations] = useState<readonly ChatCitation[]>([]);
   const [feedback, setFeedback] = useState<string | null>(null);
-  const [retryRequest, setRetryRequest] = useState<RetryRequest | null>(null);
+  const [activeStream, setActiveStream] = useState<ActiveChatStream | null>(null);
+  const conversationControlsLocked = areConversationControlsLocked(
+    sending,
+    pendingAction,
+  );
+
+  const dispatchStream = useCallback((action: ChatStreamAction) => {
+    setActiveStream((current) => current ? chatStreamReducer(current, action) : current);
+  }, []);
 
   const loadConversations = useCallback(async (preferredId?: string) => {
     const items = await api.listConversations();
@@ -73,14 +80,15 @@ export function ChatScreen({ api }: ChatScreenProps) {
   }, [api]);
 
   const selectConversation = async (id: string) => {
+    if (sending) return;
     setActiveId(id);
     setActiveConversation((await api.getConversation(id)) ?? null);
     setFeedback(null);
-    setRetryRequest(null);
+    setActiveStream(null);
   };
 
   const createConversation = async () => {
-    if (pendingAction) return;
+    if (pendingAction || sending) return;
     setPendingAction("create");
     setFeedback(null);
     try {
@@ -107,7 +115,7 @@ export function ChatScreen({ api }: ChatScreenProps) {
   };
 
   const deleteConversation = async (id: string) => {
-    if (pendingAction) return;
+    if (pendingAction || sending) return;
     setPendingAction(`delete:${id}`);
     setFeedback(null);
     try {
@@ -127,33 +135,90 @@ export function ChatScreen({ api }: ChatScreenProps) {
     }
   };
 
-  const sendQuestion = async (request: RetryRequest) => {
+  const sendQuestion = async (
+    request: ChatStreamRequest,
+    preserveCurrentAnswer = false,
+  ) => {
     if (sending) return;
     setSending(true);
-    setPendingQuestion(request.question);
-    setStreamedContent("");
-    setStreamedCitations([]);
     setFeedback(null);
+    let autoRecoveryUsed = preserveCurrentAnswer
+      ? activeStream?.autoRecoveryUsed ?? true
+      : false;
+    if (preserveCurrentAnswer) dispatchStream({ type: "recover", automatic: false });
+    else setActiveStream(createActiveChatStream(request));
+
     try {
-      await api.sendMessage(request.conversationId, request.question, {
-        idempotencyKey: request.idempotencyKey,
-        onDelta: (content) => setStreamedContent((current) => current + content),
-        onCitation: (citation) => {
-          setStreamedCitations((current) => [...current, citation]);
-        },
-      });
-      setRetryRequest(null);
-      setQuestion("");
-      await loadConversations(request.conversationId);
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : "发送失败，请稍后重试");
-      setQuestion(request.question);
-      setRetryRequest(error instanceof ChatStreamError && error.retryable ? request : null);
+      while (true) {
+        let queuedDelta = "";
+        let deltaFrame: number | undefined;
+        const flushDelta = () => {
+          if (!queuedDelta) return;
+          const content = queuedDelta;
+          queuedDelta = "";
+          deltaFrame = undefined;
+          dispatchStream({ type: "delta", content });
+        };
+        const queueDelta = (content: string) => {
+          queuedDelta += content;
+          if (deltaFrame === undefined) {
+            deltaFrame = window.requestAnimationFrame(flushDelta);
+          }
+        };
+        const replaceWithSnapshot = (content: string) => {
+          if (deltaFrame !== undefined) window.cancelAnimationFrame(deltaFrame);
+          deltaFrame = undefined;
+          queuedDelta = "";
+          dispatchStream({ type: "snapshot", content });
+        };
+        try {
+          await api.sendMessage(request.conversationId, request.question, {
+            idempotencyKey: request.idempotencyKey,
+            onMeta: (meta) => dispatchStream({ type: "meta", meta }),
+            onSnapshot: (snapshot) => {
+              replaceWithSnapshot(snapshot.content);
+            },
+            onDelta: (delta) => {
+              queueDelta(delta.content);
+            },
+            onCitation: (citation) => {
+              dispatchStream({ type: "citation", citation });
+            },
+          });
+          if (deltaFrame !== undefined) window.cancelAnimationFrame(deltaFrame);
+          flushDelta();
+          dispatchStream({ type: "complete" });
+          setQuestion("");
+          try {
+            await loadConversations(request.conversationId);
+            setActiveStream(null);
+          } catch (historyError) {
+            setFeedback(
+              historyError instanceof Error
+                ? `回答已完成，但历史消息同步失败：${historyError.message}`
+                : "回答已完成，但历史消息同步失败",
+            );
+          }
+          return;
+        } catch (error) {
+          if (deltaFrame !== undefined) window.cancelAnimationFrame(deltaFrame);
+          flushDelta();
+          const retryable = error instanceof ChatStreamError && error.retryable;
+          if (shouldAutoRecover(retryable, autoRecoveryUsed)) {
+            autoRecoveryUsed = true;
+            dispatchStream({ type: "recover", automatic: true });
+            continue;
+          }
+          dispatchStream({
+            type: "fail",
+            message: error instanceof Error ? error.message : "发送失败，请稍后重试",
+            retryable,
+          });
+          return;
+        }
+      }
     } finally {
       setSending(false);
-      setPendingQuestion(null);
-      setStreamedContent("");
-      setStreamedCitations([]);
     }
   };
 
@@ -161,13 +226,12 @@ export function ChatScreen({ api }: ChatScreenProps) {
     event.preventDefault();
     const currentQuestion = question.trim();
     if (!activeId || !currentQuestion || currentQuestion.length > 4000 || sending) return;
-    const request = {
+    const request: ChatStreamRequest = {
       conversationId: activeId,
       question: currentQuestion,
       idempotencyKey: createIdempotencyKey("send-chat-message"),
     };
     setQuestion("");
-    setRetryRequest(null);
     void sendQuestion(request);
   };
 
@@ -183,7 +247,7 @@ export function ChatScreen({ api }: ChatScreenProps) {
         <button
           type="button"
           className="primary chat-new-button"
-          disabled={pendingAction !== null}
+          disabled={conversationControlsLocked}
           onClick={() => void createConversation()}
         >
           {pendingAction === "create" ? <span className="button-spinner" /> : <Plus size={15} />}
@@ -198,6 +262,7 @@ export function ChatScreen({ api }: ChatScreenProps) {
             <button
               type="button"
               className="chat-list-select"
+              disabled={conversationControlsLocked}
               onClick={() => void selectConversation(conversation.id)}
             >
               <span className="chat-list-copy">
@@ -208,7 +273,7 @@ export function ChatScreen({ api }: ChatScreenProps) {
             <IconButton
               className="chat-delete-button"
               label={`删除${conversation.title}`}
-              disabled={pendingAction !== null}
+              disabled={conversationControlsLocked}
               onClick={() => void deleteConversation(conversation.id)}
             >
               <Trash2 size={14} />
@@ -223,7 +288,7 @@ export function ChatScreen({ api }: ChatScreenProps) {
             <span>当前提问集</span>
             <select
               value={activeId ?? ""}
-              disabled={loading || conversations.length === 0}
+              disabled={loading || conversations.length === 0 || conversationControlsLocked}
               onChange={(event) => void selectConversation(event.target.value)}
             >
               {conversations.map((conversation) => (
@@ -236,7 +301,7 @@ export function ChatScreen({ api }: ChatScreenProps) {
           <button
             type="button"
             className="secondary"
-            disabled={pendingAction !== null}
+            disabled={conversationControlsLocked}
             onClick={() => void createConversation()}
           >
             <Plus size={14} />新建
@@ -244,7 +309,7 @@ export function ChatScreen({ api }: ChatScreenProps) {
           <button
             type="button"
             className="secondary danger-action"
-            disabled={!activeId || pendingAction !== null}
+            disabled={!activeId || conversationControlsLocked}
             onClick={() => activeId ? void deleteConversation(activeId) : undefined}
           >
             <Trash2 size={14} />删除
@@ -263,7 +328,7 @@ export function ChatScreen({ api }: ChatScreenProps) {
           </span>
         </header>
 
-        <div className="messages" aria-label="问答内容" aria-busy={loading}>
+        <div className="messages" aria-label="问答内容" aria-busy={loading || sending}>
           <div className="message-stream">
             {!loading && !activeConversation ? (
               <div className="table-state">暂无提问集，请先新建会话。</div>
@@ -293,37 +358,23 @@ export function ChatScreen({ api }: ChatScreenProps) {
                     ) : null}
                   </div>
                   {message.role === "assistant" ? (
-                    <MarkdownAnswer content={message.content} />
+                    <AssistantAnswer
+                      content={message.content}
+                      citations={message.citations}
+                    />
                   ) : (
                     <p>{message.content}</p>
                   )}
-                  {message.citations.length > 0 ? (
-                    <div className="chat-sources" aria-label="回答引用来源">
-                      {message.citations.map((citation, index) => (
-                        <article className="chat-source-card" key={citation.documentId}>
-                          <span className="chat-source-index">
-                            {String(index + 1).padStart(2, "0")}
-                          </span>
-                          <div>
-                            <span className="chat-source-meta">正式入库来源</span>
-                            <strong>{citation.documentName}</strong>
-                            {citation.location ? <small>{citation.location}</small> : null}
-                            {citation.excerpt ? <small>{citation.excerpt}</small> : null}
-                          </div>
-                        </article>
-                      ))}
-                    </div>
-                  ) : null}
                 </div>
               </div>
             ))}
-            {sending ? (
+            {activeStream ? (
               <>
                 <div className="message message-user">
                   <b className="avatar me">我</b>
                   <div className="message-body">
                     <div className="message-author"><strong>你</strong></div>
-                    <p>{pendingQuestion}</p>
+                    <p>{activeStream.request.question}</p>
                   </div>
                 </div>
                 <div className="message message-assistant">
@@ -331,28 +382,16 @@ export function ChatScreen({ api }: ChatScreenProps) {
                   <div className="message-body">
                     <div className="message-author">
                       <strong>制度助手</strong>
-                      <Status tone="info">实时生成</Status>
+                      <Status tone={activeStream.phase === "failed" ? "danger" : activeStream.phase === "completed" ? "success" : "info"}>
+                        {activeStream.phase === "failed" ? "回答中断" : activeStream.phase === "completed" ? "回答完成" : "实时生成"}
+                      </Status>
                     </div>
-                    <MarkdownAnswer
-                      content={streamedContent || "正在检索正式知识库并整理回答…"}
+                    <StreamingAnswer
+                      stream={activeStream}
+                      sending={sending}
+                      dispatch={dispatchStream}
+                      onRetry={() => void sendQuestion(activeStream.request, true)}
                     />
-                    {streamedCitations.length > 0 ? (
-                      <div className="chat-sources" aria-label="实时回答引用来源">
-                        {streamedCitations.map((citation, index) => (
-                          <article className="chat-source-card" key={`${citation.documentId}-${index}`}>
-                            <span className="chat-source-index">
-                              {String(index + 1).padStart(2, "0")}
-                            </span>
-                            <div>
-                              <span className="chat-source-meta">正式入库来源</span>
-                              <strong>{citation.documentName}</strong>
-                              {citation.location ? <small>{citation.location}</small> : null}
-                              {citation.excerpt ? <small>{citation.excerpt}</small> : null}
-                            </div>
-                          </article>
-                        ))}
-                      </div>
-                    ) : null}
                   </div>
                 </div>
               </>
@@ -384,11 +423,6 @@ export function ChatScreen({ api }: ChatScreenProps) {
               <span className={feedback.includes("失败") ? "error" : undefined}>
                 {feedback}
               </span>
-            ) : null}
-            {retryRequest ? (
-              <button type="button" className="secondary" disabled={sending} onClick={() => void sendQuestion(retryRequest)}>
-                <RotateCcw size={14} /> 使用原请求重试
-              </button>
             ) : null}
           </div>
         </footer>
