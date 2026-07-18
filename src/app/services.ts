@@ -98,7 +98,7 @@ const auth: AuthApi = new ContinewAuthApi(new HttpClient({
 }));
 
 const businessClient = new HttpClient({
-  baseUrl: "",
+  baseUrl: "/api/continew",
   getAccessToken,
   onUnauthorized: clearAccessToken,
 });

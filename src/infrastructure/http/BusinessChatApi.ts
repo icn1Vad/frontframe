@@ -201,7 +201,7 @@ export class BusinessChatApi implements ChatApi {
     let response: Response;
     try {
       response = await fetch(
-        `/business/chat/conversations/${encodeURIComponent(conversationId)}/messages/stream`,
+        `/api/continew/business/chat/conversations/${encodeURIComponent(conversationId)}/messages/stream`,
         {
           method: "POST",
           credentials: "include",

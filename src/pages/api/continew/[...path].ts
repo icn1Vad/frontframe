@@ -1,14 +1,28 @@
+import type { IncomingHttpHeaders } from "node:http";
+import { request as httpRequest } from "node:http";
+import { request as httpsRequest } from "node:https";
 import type { NextApiRequest, NextApiResponse } from "next";
 import {
-  buildContinewAuthHeaders,
-  resolveContinewAuthRoute,
+  buildContinewProxyHeaders,
+  resolveContinewProxyRoute,
 } from "../../../infrastructure/http/continewAuthProxy";
+
+export const config = {
+  api: {
+    bodyParser: false,
+    responseLimit: false,
+  },
+};
 
 function sendProxyError(
   response: NextApiResponse,
   status: number,
   message: string,
 ): void {
+  if (response.headersSent) {
+    response.end();
+    return;
+  }
   response.status(status).json({
     code: String(status),
     msg: message,
@@ -18,45 +32,71 @@ function sendProxyError(
   });
 }
 
-export default async function handler(
+function copyResponseHeaders(
+  headers: IncomingHttpHeaders,
+  response: NextApiResponse,
+): void {
+  const allowed = [
+    "cache-control",
+    "content-disposition",
+    "content-length",
+    "content-type",
+    "etag",
+    "last-modified",
+    "retry-after",
+    "x-csrf-token",
+    "x-trace-id",
+  ] as const;
+  for (const name of allowed) {
+    const value = headers[name];
+    if (value !== undefined) response.setHeader(name, value);
+  }
+  if (!headers["cache-control"]) response.setHeader("Cache-Control", "no-store");
+}
+
+export default function handler(
   request: NextApiRequest,
   response: NextApiResponse,
-): Promise<void> {
-  const upstreamPath = resolveContinewAuthRoute(
+): void {
+  const upstreamPath = resolveContinewProxyRoute(
     request.query.path,
     request.method,
   );
   if (!upstreamPath) {
-    sendProxyError(response, 404, "登录代理路径不存在");
+    sendProxyError(response, 404, "代理路径不存在");
     return;
   }
 
   const backendOrigin = process.env.API_BACKEND_ORIGIN?.replace(/\/+$/, "");
   if (!backendOrigin) {
-    sendProxyError(response, 503, "登录服务地址未配置");
+    sendProxyError(response, 503, "后端服务地址未配置");
     return;
   }
 
+  let upstreamUrl: URL;
   try {
-    const upstreamResponse = await fetch(`${backendOrigin}${upstreamPath}`, {
-      method: request.method,
-      headers: buildContinewAuthHeaders(request.headers),
-      body: request.method === "GET"
-        ? undefined
-        : typeof request.body === "string"
-          ? request.body
-          : JSON.stringify(request.body),
-      redirect: "manual",
-    });
-    const contentType = upstreamResponse.headers.get("content-type");
-    const traceId = upstreamResponse.headers.get("x-trace-id");
-    if (contentType) response.setHeader("Content-Type", contentType);
-    if (traceId) response.setHeader("X-Trace-Id", traceId);
-    response.setHeader("Cache-Control", "no-store");
-
-    const responseBody = Buffer.from(await upstreamResponse.arrayBuffer());
-    response.status(upstreamResponse.status).send(responseBody);
+    const query = new URL(request.url ?? "", "http://localhost").search;
+    upstreamUrl = new URL(`${upstreamPath}${query}`, `${backendOrigin}/`);
   } catch {
-    sendProxyError(response, 502, "登录服务暂不可用");
+    sendProxyError(response, 503, "后端服务地址无效");
+    return;
   }
+
+  const transport = upstreamUrl.protocol === "https:" ? httpsRequest : httpRequest;
+  const upstreamRequest = transport(upstreamUrl, {
+    method: request.method,
+    headers: buildContinewProxyHeaders(request.headers),
+  }, (upstreamResponse) => {
+    response.statusCode = upstreamResponse.statusCode ?? 502;
+    copyResponseHeaders(upstreamResponse.headers, response);
+    upstreamResponse.on("error", () => response.destroy());
+    response.once("close", () => upstreamResponse.destroy());
+    upstreamResponse.pipe(response);
+  });
+
+  upstreamRequest.on("error", () => {
+    sendProxyError(response, 502, "后端服务暂不可用");
+  });
+  request.on("aborted", () => upstreamRequest.destroy());
+  request.pipe(upstreamRequest);
 }

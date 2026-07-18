@@ -14,10 +14,11 @@ describe("BusinessChatApi SSE", () => {
       "event: citation\r\ndata: {\"citation\":{\"sourceId\":\"p1\",\"sourceName\":\"采购制度\",\"location\":\"第三条\",\"excerpt\":null}}\r\n\r\n",
       "event: done\r\ndata: {\"messageId\":\"m1\"}\r\n\r\n",
     ];
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(body.join(""), {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(body.join(""), {
       status: 200,
       headers: { "content-type": "text/event-stream" },
-    })));
+    }));
+    vi.stubGlobal("fetch", fetchMock);
     const deltas: string[] = [];
     const api = new BusinessChatApi(
       () => "token",
@@ -38,6 +39,10 @@ describe("BusinessChatApi SSE", () => {
       excerpt: null,
     }]);
     expect(deltas).toEqual(["采购事项", "需要审批。"]);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/continew/business/chat/conversations/c1/messages/stream",
+      expect.objectContaining({ method: "POST" }),
+    );
   });
 
   it("将 error 事件作为失败返回", async () => {
