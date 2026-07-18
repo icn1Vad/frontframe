@@ -40,7 +40,7 @@ describe("BusinessContractReviewApi", () => {
     }));
   });
 
-  it("单合同流程先上传 CONTRACT，再提交审查偏向和范围且不上传制度", async () => {
+  it("单合同流程上传 CONTRACT 后直接进入临时预览且不创建正式任务", async () => {
     const request = vi.fn()
       .mockResolvedValueOnce({
         fileId: "uploaded-contract",
@@ -48,17 +48,10 @@ describe("BusinessContractReviewApi", () => {
         size: 4,
         contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         documentType: "CONTRACT",
-      })
-      .mockResolvedValueOnce({
-        ...succeededTask,
-        contract: { fileId: "uploaded-contract", fileName: "采购合同.docx" },
-        policies: undefined,
-        status: "CREATED",
-        progress: 0,
       });
     const api = new BusinessContractReviewApi({ request } as unknown as HttpClient);
 
-    await api.createTask({
+    const task = await api.createTask({
       file: new File(["docx"], "采购合同.docx"),
       name: "采购合同（甲方）.docx",
       size: 4,
@@ -66,7 +59,7 @@ describe("BusinessContractReviewApi", () => {
       modules: ["transaction", "termination"],
     }, { idempotencyKey: "idem-single-contract" });
 
-    expect(request).toHaveBeenCalledTimes(2);
+    expect(request).toHaveBeenCalledTimes(1);
     const [uploadPath, uploadOptions] = request.mock.calls[0];
     expect(uploadPath).toBe("/business/documents");
     expect(uploadOptions).toMatchObject({
@@ -76,19 +69,13 @@ describe("BusinessContractReviewApi", () => {
     expect(uploadOptions.body).toBeInstanceOf(FormData);
     expect(uploadOptions.body.get("documentType")).toBe("CONTRACT");
 
-    expect(request.mock.calls[1]).toEqual([
-      "/business/contract-reviews/tasks",
-      expect.objectContaining({
-        method: "POST",
-        idempotencyKey: "idem-single-contract",
-        body: {
-          contractFileId: "uploaded-contract",
-          name: "采购合同（甲方）.docx",
-          stance: "party-a",
-          modules: ["transaction", "termination"],
-        },
-      }),
-    ]);
+    expect(task).toMatchObject({
+      id: "contract-preview-uploaded-contract",
+      status: "preview",
+      contractFileId: "uploaded-contract",
+      policies: [],
+      currentStage: "未选择制度依据，仅进入临时预览",
+    });
   });
 
   it("成功任务按 taskId 查询结果并映射制度依据和风险", async () => {

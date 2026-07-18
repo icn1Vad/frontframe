@@ -7,7 +7,7 @@ import {
   LoaderCircle,
   RotateCcw,
 } from "lucide-react";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import type { ChatCitation } from "../../app/services";
 import { MarkdownAnswer } from "./MarkdownAnswer";
 import type { ActiveChatStream, ChatStreamAction } from "./chatStreamState";
@@ -108,7 +108,23 @@ function ProcessIcon({ stream }: { readonly stream: ActiveChatStream }) {
   return <LoaderCircle className="chat-process-spinner" size={15} aria-hidden="true" />;
 }
 
-function ProcessSteps({ stream }: { readonly stream: ActiveChatStream }) {
+function citationActivityLabel(citations: readonly ChatCitation[]): string {
+  const names = citations
+    .map((citation) => citation.documentName?.trim())
+    .filter((name): name is string => Boolean(name));
+  const visibleNames = [...new Set(names)].slice(0, 3);
+  if (visibleNames.length === 0) return `已收到 ${citations.length} 条参考依据`;
+  const remaining = citations.length - visibleNames.length;
+  return `已收到引用：${visibleNames.join("、")}${remaining > 0 ? ` 等 ${citations.length} 条` : ""}`;
+}
+
+function ProcessSteps({
+  stream,
+  elapsedSeconds,
+}: {
+  readonly stream: ActiveChatStream;
+  readonly elapsedSeconds: number;
+}) {
   const connectionFailed = stream.phase === "failed" && !stream.connected;
   const recoveryFailed = stream.phase === "failed" && stream.autoRecoveryUsed && !stream.resumed;
   const answerCompleted = stream.phase === "completed";
@@ -119,7 +135,11 @@ function ProcessSteps({ stream }: { readonly stream: ActiveChatStream }) {
       <li className="complete"><Check size={13} />请求已提交</li>
       <li className={stream.connected ? "complete" : connectionFailed ? "failed" : "active"}>
         {stream.connected ? <Check size={13} /> : connectionFailed ? <AlertCircle size={13} /> : <LoaderCircle size={13} />}
-        {stream.connected ? "已建立流式连接" : connectionFailed ? "流式连接未建立" : "正在建立流式连接"}
+        {stream.connected
+          ? "问答服务已受理"
+          : connectionFailed
+            ? "问答服务未响应"
+            : `正在等待问答服务响应 · ${elapsedSeconds} 秒`}
       </li>
       {stream.autoRecoveryUsed || stream.resumed ? (
         <li className={stream.resumed ? "complete" : recoveryFailed ? "failed" : "active"}>
@@ -130,17 +150,19 @@ function ProcessSteps({ stream }: { readonly stream: ActiveChatStream }) {
       <li className={answerCompleted ? "complete" : answerFailed ? "failed" : answerPending ? "pending" : "active"}>
         {answerCompleted ? <Check size={13} /> : answerFailed ? <AlertCircle size={13} /> : answerPending ? <Circle size={10} /> : <LoaderCircle size={13} />}
         {answerCompleted
-          ? "回答已完成"
+          ? `回答已完成 · ${stream.content.length} 字`
           : answerFailed
-            ? "生成已中断"
+            ? stream.content
+              ? `回答在 ${stream.content.length} 字处中断`
+              : "回答生成已中断"
             : answerPending
               ? "连接后开始接收回答"
               : stream.content
-                ? "正在接收回答正文"
-                : "连接已建立，等待首段回答"}
+                ? `正在接收回答 · ${stream.content.length} 字`
+                : `等待首段回答 · 已运行 ${elapsedSeconds} 秒`}
       </li>
       {stream.citations.length > 0 ? (
-        <li className="complete"><Check size={13} />已收集 {stream.citations.length} 条参考依据</li>
+        <li className="complete"><Check size={13} />{citationActivityLabel(stream.citations)}</li>
       ) : null}
     </ol>
   );
@@ -160,6 +182,17 @@ export function StreamingAnswer({
   onRetry,
 }: StreamingAnswerProps) {
   const processId = useId();
+  const isRunning = stream.phase !== "completed" && stream.phase !== "failed";
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  useEffect(() => {
+    if (!isRunning) return;
+    const timer = window.setInterval(() => {
+      setElapsedSeconds((current) => current + 1);
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [isRunning]);
+
   return (
     <>
       <span className="visually-hidden" role="status" aria-live="polite">
@@ -179,7 +212,11 @@ export function StreamingAnswer({
           <ChevronDown className="chat-process-chevron" size={15} aria-hidden="true" />
         </button>
         <div id={processId} className="chat-process-panel" hidden={!stream.processExpanded}>
-          <ProcessSteps stream={stream} />
+          <div className="chat-process-panel-meta">
+            <strong>运行动态</strong>
+            <small>{isRunning ? `已运行 ${elapsedSeconds} 秒` : stream.phase === "completed" ? "运行完成" : "运行中断"}</small>
+          </div>
+          <ProcessSteps stream={stream} elapsedSeconds={elapsedSeconds} />
         </div>
       </div>
 

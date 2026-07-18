@@ -422,6 +422,9 @@ h1, h2, h3, p { margin: 0; }
 .chat-process-spinner, .chat-process-steps .active > svg { animation: motion-spinner .9s linear infinite; }
 .chat-process-panel { width: min(560px, 100%); margin: 4px 0 0 8px; padding: 10px 13px; background: #faf8f4; border: 1px solid var(--divider); border-radius: 9px; }
 .chat-process-panel[hidden] { display: none; }
+.chat-process-panel-meta { margin-bottom: 9px; padding-bottom: 8px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--divider); }
+.chat-process-panel-meta strong { color: var(--text); font-size: 11px; }
+.chat-process-panel-meta small { color: var(--muted); font-size: 10px; }
 .chat-process-steps { margin: 0; padding: 0; display: grid; gap: 8px; list-style: none; }
 .chat-process-steps li { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 11px; line-height: 1.45; }
 .chat-process-steps li.complete { color: #52705a; }

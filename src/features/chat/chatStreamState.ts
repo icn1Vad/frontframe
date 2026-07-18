@@ -100,14 +100,12 @@ export function chatStreamReducer(
         ...state,
         phase: "recovering",
         content: action.content,
-        processExpanded: false,
       };
     case "delta":
       return {
         ...state,
         phase: "generating",
         content: state.content + action.content,
-        processExpanded: state.content ? state.processExpanded : false,
       };
     case "citation": {
       const key = citationKey(action.citation);

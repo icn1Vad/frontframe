@@ -82,6 +82,7 @@ interface LocalTaskState {
   readonly name?: string;
   readonly stance?: ContractReviewStance;
   readonly modules?: readonly ContractReviewModuleId[];
+  readonly previewTask?: ContractReviewTask;
   readonly riskStates?: Readonly<Record<string, {
     readonly state: ContractRiskState;
     readonly reason?: string;
@@ -172,6 +173,28 @@ function applyLocalState(task: ContractReviewTask): ContractReviewTask {
   };
 }
 
+function createPolicylessPreviewTask(
+  input: CreateContractReviewTaskCommand,
+  contractFileId: string,
+): ContractReviewTask {
+  return {
+    id: `contract-preview-${contractFileId}`,
+    version: 1,
+    name: input.name,
+    size: input.size,
+    stance: input.stance,
+    modules: [...input.modules],
+    status: "preview",
+    progress: 0,
+    createdAt: new Date().toISOString(),
+    clauses: [],
+    risks: [],
+    contractFileId,
+    policies: [],
+    currentStage: "未选择制度依据，仅进入临时预览",
+  };
+}
+
 function mapTask(dto: ContractTaskDto, result?: ContractResultDto): ContractReviewTask {
   const risks = result?.findings.map(mapFinding) ?? [];
   const modules = risks.length > 0
@@ -238,11 +261,22 @@ export class BusinessContractReviewApi implements ContractReviewApi {
       "/business/contract-reviews/tasks",
       { query: { page: 1, size: 100 }, signal: options?.signal },
     );
-    return data.list.map((task) => mapTask(task));
+    const remoteTasks = data.list.map((task) => mapTask(task));
+    const previewTasks = Object.values(readLocalState())
+      .map((state) => state.previewTask)
+      .filter((task): task is ContractReviewTask => Boolean(task));
+    const remoteIds = new Set(remoteTasks.map((task) => task.id));
+    return [...previewTasks.filter((task) => !remoteIds.has(task.id)), ...remoteTasks]
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
   }
 
   async getTask(taskId: string, options?: ContractRequestOptions): Promise<ContractReviewTask | undefined> {
     this.ensureAuthenticated();
+    const previewTask = readLocalState()[taskId]?.previewTask;
+    if (previewTask) {
+      options?.signal?.throwIfAborted();
+      return applyLocalState(previewTask);
+    }
     const dto = await this.client.request<ContractTaskDto>(
       `/business/contract-reviews/tasks/${encodeURIComponent(taskId)}`,
       { signal: options?.signal },
@@ -284,6 +318,19 @@ export class BusinessContractReviewApi implements ContractReviewApi {
     const contractFileId = uploaded?.fileId ?? input.contractFileId;
     if (!contractFileId) throw new Error("合同文件上传后未返回 fileId");
     const policyFileIds = input.policyFileIds ?? [];
+    if (policyFileIds.length === 0) {
+      const previewTask = createPolicylessPreviewTask(input, contractFileId);
+      const states = readLocalState();
+      states[previewTask.id] = {
+        ...states[previewTask.id],
+        name: input.name,
+        stance: input.stance,
+        modules: [...input.modules],
+        previewTask,
+      };
+      writeLocalState(states);
+      return previewTask;
+    }
     const dto = await this.client.request<ContractTaskDto>("/business/contract-reviews/tasks", {
       method: "POST",
       body: {

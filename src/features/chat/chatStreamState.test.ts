@@ -13,7 +13,7 @@ const request = {
 };
 
 describe("chatStreamState", () => {
-  it("从连接进入生成并在首段正文到达后收起过程", () => {
+  it("从连接进入生成并在首段正文到达后保持运行动态展开", () => {
     let state = createActiveChatStream(request);
     state = chatStreamReducer(state, {
       type: "meta",
@@ -31,7 +31,7 @@ describe("chatStreamState", () => {
       phase: "generating",
       connected: true,
       content: "需要履行审批程序。",
-      processExpanded: false,
+      processExpanded: true,
     });
   });
 

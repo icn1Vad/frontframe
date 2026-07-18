@@ -49,7 +49,7 @@ interface ChatMessage {
 }
 
 function statusMeta(task: ContractReviewTask) {
-  if (task.status === "preview") return { label: "WPS 可预览编辑", tone: "info" as const };
+  if (task.status === "preview") return { label: "临时预览模式", tone: "info" as const };
   if (task.status === "stored") return { label: "已入库", tone: "success" as const };
   if (task.status === "reported") return { label: "报告已生成", tone: "warning" as const };
   if (task.status === "failed") return { label: "审查失败", tone: "danger" as const };
@@ -350,8 +350,8 @@ export function ContractReviewWorkbenchScreen({
       {previewOnly ? (
         <section className="contract-progress-panel contract-wps-phase-note">
           <div>
-            <strong>真实 DOCX 在线编辑验证</strong>
-            <span>演示模式只验证 WPS 打开和输入修改；当前修改不生成正式版本，刷新后不保证保留。</span>
+            <strong>合同已上传，暂未创建正式审查任务</strong>
+            <span>当前未选择制度依据，因此先进入临时预览工作台；不会执行合规审查、生成风险结果或写入正式任务池。</span>
           </div>
         </section>
       ) : !reportGenerated ? (
@@ -447,7 +447,7 @@ export function ContractReviewWorkbenchScreen({
               <div className="contract-panel-heading"><div><h3>风险项目</h3><p>点击卡片或“定位原文”，左侧会滚动到对应条款。</p></div><span className="contract-risk-total">{task.risks.length} 项</span></div>
               <div className="contract-risk-filter-summary"><span className="high">高风险 {riskCounts.high}</span><span className="medium">中风险 {riskCounts.medium}</span><span className="low">低风险 {riskCounts.low}</span></div>
               <div className="contract-risk-list">
-                {task.risks.length === 0 ? <div className="contract-risk-empty"><CheckCircle2 size={22} /><strong>{previewOnly ? "WPS 编辑功能已独立开放" : "当前模块未发现风险项"}</strong><span>{previewOnly ? "风险审查链路本阶段暂未接入。" : "人工确认后可以直接入库。"}</span></div> : null}
+                {task.risks.length === 0 ? <div className="contract-risk-empty"><CheckCircle2 size={22} /><strong>{previewOnly ? "合同预览工作台已开放" : "当前模块未发现风险项"}</strong><span>{previewOnly ? "选择至少一份制度依据后，才能创建正式合规审查任务。" : "人工确认后可以直接入库。"}</span></div> : null}
                 {task.risks.map((risk) => {
                   const selected = risk.id === selectedRiskId;
                   const handled = risk.state !== "open";
